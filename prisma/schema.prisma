@@ -1,0 +1,551 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CUSTOMER
+  STAFF
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHERS
+}
+
+enum ActiveStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum LessonType {
+  VIDEO
+  TEXT
+  BOTH
+}
+
+enum TokenType {
+  EMAIL // used as a short-lived token sent to the user's email
+  API
+}
+
+enum AmountType {
+  FIXED // used as a short-lived token sent to the user's email
+  PERCENT
+}
+
+enum TransactionType {
+  DEBIT // used as a short-lived token sent to the user's email
+  CREDIT
+}
+
+enum LoginType {
+  EMAIL
+  GOOGLE
+  FACEBOOK
+  APPLE
+  PHONE
+}
+
+enum BannerLocation {
+  HOME
+  COURSE
+  SUCCESS_STORY
+  REFER
+  LIVE
+  MARKET
+  BLOG
+  BLOG_DETAILS
+}
+
+enum PaymentType {
+  DEBITCARD
+  CREDITCARD
+  NETBNKING
+  UPI
+  ONLINE
+}
+
+model User {
+  id            String       @id @unique @default(uuid())
+  email         String       @unique
+  contact       String
+  loginType     LoginType    @default(EMAIL)
+  password      String
+  role          Role         @default(CUSTOMER)
+  avatarUrl     String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  status        ActiveStatus @default(ACTIVE)
+  token         Token[]
+  admin         Admin[]
+  staff         Staff[]
+  customer      Customer[]
+  refreshToken  String?
+  refer refer[]
+  cart Cart[]
+  videoAnalytics VideoAnalytics[]
+}
+
+model Token {
+  id         Int       @id @default(autoincrement())
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  type       TokenType @default(EMAIL)
+  emailToken String?   @unique // Only used for short lived email tokens
+  valid      Boolean   @default(true)
+  expiration DateTime
+  // Relation fields
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+}
+
+model Admin {
+  id        String       @id @unique @default(uuid())
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  name      String
+  address   Address[]
+  status    ActiveStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model Staff {
+  id        String       @id @unique @default(uuid())
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  name      String
+  address   Address[]
+  StaffRole StaffRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId String
+  status    ActiveStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model Customer {
+  id        String       @id @unique @default(uuid())
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  name      String
+  address   Address[]
+  wishlist  Wishlist[]
+  review    Review[]
+  orders    Orders[]
+  
+  // As referrer - customers this user has referred
+  referredCustomers Referal[] @relation("Referrer")
+  
+  // As referred - who referred this customer
+  referredBy       Referal?  @relation("Referred")
+  
+  // Unique referral code for this customer
+  referalCode      String    @unique
+  
+  discountCoupon      DiscountCoupon[]
+  EventRegistration   EventRegistration[]
+  status              ActiveStatus @default(ACTIVE)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+}
+
+model Address {
+  id         String       @id @unique @default(uuid())
+  address    String
+  city       String?
+  state      String?
+  pinCode    String
+  country    String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  admin      Admin?       @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  adminId    String?
+  customer   Customer?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String?
+  staff      Staff?       @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  staffId    String?
+  status     ActiveStatus @default(ACTIVE)
+}
+
+model Wishlist {
+  id         String       @id @unique @default(uuid())
+  customer   Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String
+  course     Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId   String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  status     ActiveStatus @default(ACTIVE)
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String
+  description String
+  imageUrl    String     // URL or path to the category image
+  icon        String     // URL or path to the icon image
+  parentId    String?    // Self-referential relationship for parent category
+  featured Boolean @default(false) 
+  status      ActiveStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  createdBy   String
+  
+  // Self-referential relationship
+  parent      Category?  @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[] @relation("CategoryToCategory")
+  
+  // Relations
+  courses     Course[]
+  blogs       Blog[]
+  
+  @@map("categories")
+  SuccessStory SuccessStory[]
+}
+
+model Course {
+  id       String     @id @unique @default(uuid())
+  name String
+  image String?
+  teaserVideo String
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String 
+  shortDescription String
+  longDesription String 
+  creator Creators @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  creatorId String
+  featured Boolean @default(false)
+  language String
+  status ActiveStatus @default(ACTIVE)
+  price String
+  whatsAppLink String
+  pdfLink String?
+  createdBy String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  wishlist Wishlist[]
+  product Product[]
+  review Review[]
+  orders Orders[]
+  discountCoupon DiscountCoupon[]
+  cart Cart[]
+  videoAnalytics VideoAnalytics[]
+  courseFAQ CourseFAQ[]
+}
+
+model CourseFAQ {
+  id       String     @id @unique @default(uuid())
+  question String
+  answer String
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId String 
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Product {
+  id          String       @id @unique @default(uuid())
+  name        String
+  discription String
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId    String
+  lessonType  LessonType   @default(VIDEO)
+  videoLink   String?
+  textContent String?
+  status      ActiveStatus @default(ACTIVE)
+  createdBy   String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  videoAnalytics VideoAnalytics[]
+}
+
+
+model Review {
+  id       String     @id @unique @default(uuid())
+  details String
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId String 
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String
+  ratting Int
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model DiscountCoupon {
+  id       String     @id @unique @default(uuid())
+  name String
+  couponId String
+  amount String
+  amountType  AmountType
+  course Course[]
+  customer   Customer[]
+  orders Orders[]
+  status ActiveStatus @default(ACTIVE)
+  discountStartDate DateTime
+  diacountEndDate DateTime
+  createdBy String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Orders {
+  id       String     @id @unique @default(uuid())
+  course Course[] 
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String
+  totalAmount String
+  paidAmount String
+  discountCoupon DiscountCoupon? @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  discountId String?
+  transactionId  String
+  TransactionType TransactionType
+  paymentType PaymentType
+  description String?
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Banner {
+  id String @id @unique @default(uuid())
+  name String
+  imageLink String
+  description String?
+  bannerLocation BannerLocation
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Testimonials {
+  id String @id @unique @default(uuid())
+  name String
+  imageLink String
+  description String
+  ratting String
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Blog {
+  id       String     @id @unique @default(uuid())
+  title String
+  image String
+  author Author @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId String
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String 
+  shortDescription String
+  longDesription String
+  featured Boolean @default(false) 
+  status ActiveStatus @default(ACTIVE)
+  createdBy String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Author {
+  id String @id @unique @default(uuid())
+  name String
+  imageLink String?
+  description String
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  Blog Blog[]
+}
+
+model Creators {
+  id String @id @unique @default(uuid())
+  name String
+  imageLink String?
+  designation String
+  description String
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  Course Course[]
+}
+
+model SuccessStory {
+  id String @id @unique @default(uuid())
+  name String
+  brand String
+  earning String
+  imageLink String
+  coverPhoto String
+  description String
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model refer{
+  id String @id @unique @default(uuid())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  referalCode String
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Cart{
+  id String @id @unique @default(uuid())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId String
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model VideoAnalytics {
+  id            String   @id @unique @default(uuid())
+  userId        String
+  productId     String
+  courseId      String
+  deviceType    String   // 'mobile', 'desktop', 'tablet'
+  operatingSystem String // 'Windows', 'macOS', 'Linux', 'iOS', 'Android', etc.
+  browser       String   // 'Chrome', 'Safari', 'Firefox', etc.
+  watchDuration Int      // Watch time in seconds
+  totalTime     Int      // Total video duration in seconds
+  completionRate Float    // (watchDuration / totalTime) * 100
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId]) 
+  @@index([userId])
+  @@index([productId])
+  @@index([courseId])
+  @@index([createdAt])
+}
+
+model GeneralFAQ {
+  id       String     @id @unique @default(uuid())
+  question String
+  answer String
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model FeatureGallery {
+  id String @id @unique @default(uuid())
+  imageLink String
+  description String
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+ model FeatureOn {
+  id String @id @unique @default(uuid())
+  brandUrl String
+  logo String
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Referal {
+  id           String       @id @unique @default(uuid())
+  
+  // The customer who made the referral (owner of the referral code)
+  referrer     Customer     @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referrerId   String
+  
+  // The customer who was referred (used the referral code)
+  referred     Customer     @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+  referredId   String       @unique  // A customer can only be referred once
+  
+  // The referral code that was used (redundant but useful for queries)
+  referalCode  String
+  
+  status       ActiveStatus @default(ACTIVE)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([referrerId, referredId])
+  @@index([referalCode])  // For faster lookups by referral code
+}
+
+model StaffRole{
+  id String @id @unique @default(uuid())
+  name String
+  description String
+  StaffAccess StaffAccess[]
+  Staff Staff[]
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model StaffAccess{
+  id String @id @unique @default(uuid())
+  routeName String
+  routeUrl String
+  StaffRole StaffRole[]
+  status ActiveStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Event {
+  id               String       @id @unique @default(uuid())
+  title            String
+  shortDescription String
+  description      String
+  imageLink        String?
+  date             String
+  time             String
+  venue            String
+  price            String
+  category         String
+  status           ActiveStatus @default(ACTIVE)
+  featured         Boolean      @default(false)
+  createdBy        String
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  EventRegistration EventRegistration[]
+}
+
+model EventRegistration {
+  id        String       @id @unique @default(uuid())
+  event     Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   String
+  customer  Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String
+  amount    String
+  status    ActiveStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  @@unique([eventId, customerId])
+}
