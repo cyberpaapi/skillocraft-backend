@@ -1,6 +1,8 @@
 import { Request } from 'express';
 import multer, { FileFilterCallback } from 'multer';
 import { uploadPaths } from '../config/upload.config';
+import path from 'path';
+import fs from 'fs';
 
 const bannerConfig = uploadPaths.banner;
 

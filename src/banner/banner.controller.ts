@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import prisma from '../db/db.config';
 import { AuthRequest } from '../types';
 import { uploadFile } from '../utils/uploadFile';
+import { deleteBannerImage } from './upload.middleware';
 
 /**
  * @route   GET /api/banners
