@@ -1,8 +1,12 @@
 import { Request } from 'express';
 import multer, { FileFilterCallback } from 'multer';
-//import path from 'path';
-//import fs from 'fs';
+import path from 'path';
+import fs from 'fs';
 import { uploadPaths } from '../config/upload.config';
+
+// Temp directory for large video uploads — files land here before FFmpeg picks them up
+const VIDEO_TEMP_DIR = path.join(process.cwd(), 'temp', 'uploads');
+fs.mkdirSync(VIDEO_TEMP_DIR, { recursive: true });
 
 
 
@@ -336,7 +340,13 @@ export const uploadCourseFiles = multer({
 //   limits: { fileSize: uploadPaths.productVideo.maxSize },
 // }).single('video');
 const videoStorageUpload = multer({
-  storage: multer.memoryStorage(), // IMPORTANT
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, VIDEO_TEMP_DIR),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `video-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
   fileFilter: videoFileFilter,
   limits: { fileSize: uploadPaths.productVideo.maxSize },
 });

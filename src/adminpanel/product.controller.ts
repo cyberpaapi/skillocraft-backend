@@ -16,6 +16,10 @@ import { uploadFolderToSpaces } from "../services/spacesUploader";
 import { logMemoryUsage, checkMemoryLimit, forceGarbageCollection } from "../utils/memory";
 import { deleteFolderFromSpaces } from '../utils/deleteFolderFromSpaces';
 import { uploadFile, cloudinaryConfigured } from '../utils/uploadFile';
+import { uploadVideoToVdoCipher, deleteVideoFromVdoCipher } from '../services/vdoCipher';
+
+const VDOCIPHER_ID_REGEX = /^[0-9a-f]{32}$/i;
+const vdoCipherEnabled   = !!process.env.VDOCIPHER_API_SECRET;
 // export const createProduct = async (
 //   req: AuthRequest & { file?: Express.Multer.File },
 //   res: Response,
@@ -135,87 +139,36 @@ import { uploadFile, cloudinaryConfigured } from '../utils/uploadFile';
 //   }
 // }
 
-const useLocalStorage = !process.env.DO_ACCESS_KEY || process.env.DO_ACCESS_KEY === 'placeholder';
+const r2Enabled      = !!(process.env.CF_R2_ACCESS_KEY && process.env.CF_R2_SECRET_KEY);
+const useLocalStorage = !r2Enabled;
 
 export const createProduct = async (
-  req: AuthRequest & { file?: Express.Multer.File },
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
-  const file = req.file;
   const { name, description, courseId, status, lessonType = 'VIDEO', textContent } = req.body;
 
   if (!name || !courseId) {
-    return res.status(400).json({ status: 0, message: "Name and courseId required" });
+    return res.status(400).json({ status: 0, message: 'Name and courseId required' });
   }
 
-  // Video is required only for VIDEO and BOTH lesson types
-  const needsVideo = lessonType === 'VIDEO' || lessonType === 'BOTH';
-  if (needsVideo && !file) {
-    return res.status(400).json({ status: 0, message: "Video file required for this lesson type" });
-  }
-
-  // Text content is required for TEXT and BOTH lesson types
   const needsText = lessonType === 'TEXT' || lessonType === 'BOTH';
   if (needsText && !textContent) {
-    return res.status(400).json({ status: 0, message: "Text content required for this lesson type" });
+    return res.status(400).json({ status: 0, message: 'Text content required for this lesson type' });
   }
 
   try {
     const course = await prisma.course.findUnique({ where: { id: courseId } });
-    if (!course) {
-      return res.status(404).json({ status: 0, message: "Course not found" });
-    }
-
-    const sanitizedName = name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
-    const videoId = `${sanitizedName}-${Date.now()}`;
-    let videoUrl: string | null = null;
-
-    if (file) {
-      if (useLocalStorage) {
-        // ─── Local disk storage (development) ───────────────────────────
-        const uploadsDir = path.join(process.cwd(), 'uploads', 'videos');
-        await fs.ensureDir(uploadsDir);
-        const filename = `${videoId}.mp4`;
-        await fs.writeFile(path.join(uploadsDir, filename), file.buffer);
-        videoUrl = `/uploads/videos/${filename}`;
-        console.log(`[Local] Video saved: ${videoUrl}`);
-
-      } else if (cloudinaryConfigured) {
-        // ─── Cloudinary direct upload ────────────────────────────────────
-        videoUrl = await uploadFile(file, 'skillocraft/videos', 'videos', 'video');
-
-      } else {
-        // ─── Cloud: MP4 → HLS → DigitalOcean Spaces ─────────────────────
-        const tempRoot = path.join(process.cwd(), "temp");
-        const rawVideoPath = path.join(tempRoot, `${videoId}.mp4`);
-        const hlsOutputFolder = path.join(tempRoot, videoId);
-
-        await fs.ensureDir(tempRoot);
-        logMemoryUsage('Before file save');
-        await fs.writeFile(rawVideoPath, file.buffer);
-        forceGarbageCollection();
-
-        if (checkMemoryLimit(1000)) console.log('High memory, proceeding with caution');
-        await convertToHLS(rawVideoPath, hlsOutputFolder);
-        forceGarbageCollection();
-
-        const remoteFolder = `videos/products/${videoId}`;
-        await uploadFolderToSpaces(hlsOutputFolder, remoteFolder);
-        await fs.remove(rawVideoPath);
-        await fs.remove(hlsOutputFolder);
-        forceGarbageCollection();
-
-        videoUrl = `${process.env.DO_BUCKET_URL}/${remoteFolder}/index.m3u8`;
-      }
-    }
+    if (!course) return res.status(404).json({ status: 0, message: 'Course not found' });
 
     const product = await prisma.product.create({
       data: {
         name,
         discription: description || '',
         lessonType: lessonType as any,
-        videoLink: videoUrl,
+        videoLink: null,
+        videoStatus: 'idle',
         textContent: textContent || null,
         status: status || 'ACTIVE',
         course: { connect: { id: courseId } },
@@ -224,11 +177,10 @@ export const createProduct = async (
       include: { course: { select: { id: true, name: true } } },
     });
 
-    return res.status(201).json({ status: 1, message: "Product created successfully", data: product });
-
+    return res.status(201).json({ status: 1, message: 'Product created successfully', data: product });
   } catch (error) {
-    console.error("Product creation error:", error);
-    return res.status(500).json({ status: 0, message: "Failed to create lesson" });
+    console.error('Product creation error:', error);
+    return res.status(500).json({ status: 0, message: 'Failed to create lesson' });
   }
 };
 
@@ -318,35 +270,48 @@ export const updateProduct = async (
 
   if (req.file) {
     try {
-      if (useLocalStorage) {
-        // ─── Local disk ───────────────────────────────────────────────────
+      const getBuffer = async () => req.file!.buffer ?? await fs.readFile(req.file!.path);
+
+      if (vdoCipherEnabled) {
+        // ─── VdoCipher ────────────────────────────────────────────────────
+        if (existingProduct.videoLink && VDOCIPHER_ID_REGEX.test(existingProduct.videoLink)) {
+          deleteVideoFromVdoCipher(existingProduct.videoLink).catch(console.error);
+        }
+        updateData.videoLink = await uploadVideoToVdoCipher(await getBuffer(), existingProduct.name);
+        if (req.file.path) await fs.remove(req.file.path);
+
+      } else if (useLocalStorage) {
+        // ─── Local disk (dev only) ────────────────────────────────────────
         const uploadsDir = path.join(process.cwd(), 'uploads', 'videos');
         await fs.ensureDir(uploadsDir);
         const filename = `${videoId}.mp4`;
-        await fs.writeFile(path.join(uploadsDir, filename), req.file.buffer);
+        if (req.file.path) {
+          await fs.move(req.file.path, path.join(uploadsDir, filename));
+        } else {
+          await fs.writeFile(path.join(uploadsDir, filename), req.file.buffer);
+        }
         updateData.videoLink = `/uploads/videos/${filename}`;
 
       } else if (cloudinaryConfigured) {
         // ─── Cloudinary ───────────────────────────────────────────────────
         updateData.videoLink = await uploadFile(req.file, 'skillocraft/videos', 'videos', 'video');
+        if (req.file.path) await fs.remove(req.file.path);
 
       } else {
-        // ─── DigitalOcean Spaces HLS ──────────────────────────────────────
+        // ─── R2: file already on disk ─────────────────────────────────────
         if (existingProduct.videoLink) {
-          const bucket = process.env.DO_BUCKET!;
-          const baseUrl = `https://${bucket}.sgp1.digitaloceanspaces.com/`;
-          const oldKey = existingProduct.videoLink.replace(baseUrl, "");
-          const oldFolder = oldKey.split("/master.m3u8")[0];
+          const oldFolder = existingProduct.videoLink.replace('/index.m3u8', '');
           await deleteFolderFromSpaces(oldFolder);
         }
-
-        await fs.ensureDir(tempRoot);
-        await fs.writeFile(rawVideoPath, req.file.buffer);
+        const rawVideoPath    = req.file.path ?? path.join(tempRoot, `${videoId}.mp4`);
+        const hlsOutputFolder = path.join(tempRoot, videoId);
+        if (!req.file.path) await fs.writeFile(rawVideoPath, req.file.buffer);
         await convertToHLS(rawVideoPath, hlsOutputFolder);
-
         const remoteFolder = `videos/products/${videoId}`;
         await uploadFolderToSpaces(hlsOutputFolder, remoteFolder);
-        updateData.videoLink = `${process.env.DO_BUCKET_URL}/${remoteFolder}/index.m3u8`;
+        await fs.remove(rawVideoPath);
+        await fs.remove(hlsOutputFolder);
+        updateData.videoLink = `${remoteFolder}/index.m3u8`;
       }
 
     } catch (err) {
@@ -422,16 +387,16 @@ export const deleteProduct = async (
       return;
     }
 
-    // Delete video from DO Spaces only (Cloudinary and local files are left as-is)
-    if (product.videoLink && !useLocalStorage && !cloudinaryConfigured) {
+    if (product.videoLink) {
       try {
-        const bucket = process.env.DO_BUCKET!;
-        const baseUrl = `https://${bucket}.sgp1.digitaloceanspaces.com/`;
-        const oldKey = product.videoLink.replace(baseUrl, "");
-        const oldFolder = oldKey.split("/master.m3u8")[0];
-        await deleteFolderFromSpaces(oldFolder);
+        if (VDOCIPHER_ID_REGEX.test(product.videoLink)) {
+          await deleteVideoFromVdoCipher(product.videoLink);
+        } else if (r2Enabled) {
+          const oldFolder = product.videoLink.replace('/index.m3u8', '');
+          await deleteFolderFromSpaces(oldFolder);
+        }
       } catch (err) {
-        console.warn('Could not delete video from Spaces:', err);
+        console.warn('Could not delete video:', err);
       }
     }
 

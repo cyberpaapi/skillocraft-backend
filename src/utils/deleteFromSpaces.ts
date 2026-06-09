@@ -3,10 +3,12 @@ import { spacesClient } from "../config/spaces";
 
 export const deleteFromSpaces = async (fileUrl: string) => {
   try {
-    const bucket = process.env.DO_BUCKET!;
+    const bucket = process.env.CF_R2_BUCKET!;
 
-    // Extract key from full URL
-    const key = fileUrl.split(`/${bucket}.sgp1.digitaloceanspaces.com/`)[1];
+    // fileUrl may be a full URL or a plain key — strip to just the key
+    const key = fileUrl.includes('r2.cloudflarestorage.com')
+      ? fileUrl.split('/').slice(4).join('/')
+      : fileUrl;
 
     if (!key) return;
 

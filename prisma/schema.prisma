@@ -265,6 +265,7 @@ model Product {
   courseId    String
   lessonType  LessonType   @default(VIDEO)
   videoLink   String?
+  videoStatus String       @default("idle")
   textContent String?
   status      ActiveStatus @default(ACTIVE)
   createdBy   String
@@ -495,6 +496,15 @@ model Referal {
 
   @@unique([referrerId, referredId])
   @@index([referalCode])  // For faster lookups by referral code
+}
+
+model ReferralSettings {
+  id               String   @id @default("SINGLETON")
+  discountPercent  Float    @default(20)
+  earningsPercent  Float    @default(20)
+  updatedBy        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 model StaffRole{

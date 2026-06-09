@@ -4,9 +4,9 @@ import { spacesClient } from "../config/spaces";
 
 export const getSignedHlsUrl = async (key: string) => {
   const command = new GetObjectCommand({
-    Bucket: process.env.DO_BUCKET!,
+    Bucket: process.env.CF_R2_BUCKET!,
     Key: key,
   });
 
-  return getSignedUrl(spacesClient, command, { expiresIn: 120 * 60 });
+  return getSignedUrl(spacesClient, command, { expiresIn: 5 * 60 }); // 5 minutes
 };

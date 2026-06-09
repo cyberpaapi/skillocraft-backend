@@ -19,11 +19,10 @@ export const uploadFolderToSpaces = async (
 
     await spacesClient.send(
       new PutObjectCommand({
-        Bucket: process.env.DO_BUCKET!,
+        Bucket: process.env.CF_R2_BUCKET!,
         Key: `${remoteFolder}/${file}`,
         Body: fileContent,
         ContentType: contentType,
-        ACL: "public-read",
       })
     );
   }

@@ -6,7 +6,7 @@ import { ActiveStatus, Prisma } from '@prisma/client';
 import prisma from '../db/db.config';
 import { createCourseRequestSchema } from '../schemas/course.schema';
 import { AuthRequest } from '../types';
-import { uploadToSpaces } from '../utils/uploadToSpaces';
+import { uploadFile } from '../utils/uploadFile';
 import { deleteFromSpaces } from '../utils/deleteFromSpaces';
 // import { getImageUrl } from '../middleware/upload.middleware';
 
@@ -161,20 +161,8 @@ export const createCourse = async (
   ? validatedData.featured === 'true' || validatedData.featured === '1'
   : Boolean(validatedData.featured);
 
-      const useLocalStorage = !process.env.DO_ACCESS_KEY || process.env.DO_ACCESS_KEY === 'placeholder';
-
-      const saveFile = async (file: Express.Multer.File, folder: string, localSubdir: string): Promise<string> => {
-        if (useLocalStorage) {
-          const fsExtra = await import('fs-extra');
-          const pathModule = await import('path');
-          const dir = pathModule.default.join(process.cwd(), 'uploads', localSubdir);
-          await fsExtra.default.ensureDir(dir);
-          const filename = `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-          await fsExtra.default.writeFile(pathModule.default.join(dir, filename), file.buffer);
-          return `/uploads/${localSubdir}/${filename}`;
-        }
-        return uploadToSpaces(file, folder);
-      };
+      const saveFile = async (file: Express.Multer.File, folder: string, localSubdir: string): Promise<string> =>
+        uploadFile(file, folder, localSubdir, 'image');
 
       const imageUrl = imageFile ? await saveFile(imageFile, 'images/courses', 'images/courses') : '';
 

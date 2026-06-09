@@ -11,14 +11,13 @@ export const uploadToSpaces = async (
   const fileName = `${folder}/${Date.now()}-${cleanName}`;
 
   const command = new PutObjectCommand({
-    Bucket: process.env.DO_BUCKET!, // skillo-s3
+    Bucket: process.env.CF_R2_BUCKET!,
     Key: fileName,
     Body: file.buffer,
     ContentType: file.mimetype,
-    ACL: "public-read", // remove if bucket is private
   });
 
   await spacesClient.send(command);
 
-  return `${process.env.DO_BUCKET_URL || `https://${process.env.DO_BUCKET}.${process.env.DO_REGION || "sgp1"}.${process.env.DO_SPACES_ENDPOINT || "digitaloceanspaces.com"}`}/${fileName}`;
+  return fileName; // store the key; presigned URL is generated at access time
 };

@@ -145,6 +145,27 @@ export const registerUser = async (
         if (!isUnique) {
           throw new Error('Failed to generate a unique referral code after multiple attempts');
         }
+
+        // Track referral if a referral code was provided at signup
+        const incomingReferralCode = req.body.referralCode as string | undefined;
+        if (incomingReferralCode && userProfile) {
+          const referrerCustomer = await prisma.customer.findUnique({
+            where: { referalCode: incomingReferralCode }
+          });
+          if (referrerCustomer && referrerCustomer.id !== userProfile.id) {
+            try {
+              await prisma.referal.create({
+                data: {
+                  referrerId: referrerCustomer.id,
+                  referredId: userProfile.id,
+                  referalCode: incomingReferralCode
+                }
+              });
+            } catch {
+              // Silently ignore duplicate referral (already referred)
+            }
+          }
+        }
         break;
       case 'STAFF':
         try {

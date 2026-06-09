@@ -2,7 +2,7 @@ import { ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import { spacesClient } from "../config/spaces";
 
 export const deleteFolderFromSpaces = async (folderKey: string) => {
-  const bucket = process.env.DO_BUCKET!;
+  const bucket = process.env.CF_R2_BUCKET!;
 
   const listCommand = new ListObjectsV2Command({
     Bucket: bucket,

@@ -11,7 +11,7 @@ import {
   apiErrorResponseSchema 
 } from '../schemas/admin.schema';
 import { AuthRequest, ActiveStatus } from '../types';
-import { uploadToSpaces } from '../utils/uploadToSpaces';
+import { uploadFile } from '../utils/uploadFile';
 
 export const updateCategory = async (
   req: AuthRequest & {
@@ -147,24 +147,11 @@ export const createCategory = async (
     return;
   }
 
-  const useLocalStorage = !process.env.DO_ACCESS_KEY || process.env.DO_ACCESS_KEY === 'placeholder';
-
   try {
     const files = req.files;
 
-    // Helper: save a file locally or to Spaces
-    const saveFile = async (file: Express.Multer.File, folder: string, localSubdir: string): Promise<string> => {
-      if (useLocalStorage) {
-        const fsExtra = await import('fs-extra');
-        const pathModule = await import('path');
-        const dir = pathModule.default.join(process.cwd(), 'uploads', localSubdir);
-        await fsExtra.default.ensureDir(dir);
-        const filename = `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-        await fsExtra.default.writeFile(pathModule.default.join(dir, filename), file.buffer);
-        return `/uploads/${localSubdir}/${filename}`;
-      }
-      return uploadToSpaces(file, folder);
-    };
+    const saveFile = async (file: Express.Multer.File, folder: string, localSubdir: string): Promise<string> =>
+      uploadFile(file, folder, localSubdir, 'image');
 
     // Upload image if provided (optional)
     const imageUrl = files?.image?.[0]

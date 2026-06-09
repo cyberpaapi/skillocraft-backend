@@ -124,6 +124,7 @@ import { listCustomers, listAdmins, listStaff, getCustomerOverview } from './adm
 import { listEvents, getEventById, registerForEvent, checkEventRegistered, getMyRegistrations } from './events/event.controller';
 import { createEvent, updateEvent, deleteEvent, listEventsAdmin } from './adminpanel/event.controller';
 import { listBanners, createBanner as createBannerAdmin, updateBanner as updateBannerAdmin, deleteBanner as deleteBannerAdmin } from './adminpanel/banner.controller';
+import { getReferralSettings, updateReferralSettings, getMyReferralData } from './referral/referral.controller';
 
 dotenv.config();
 const app = express();
@@ -132,10 +133,10 @@ const PORT: number = parseInt(process.env.PORT || '4000');
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-const isProduction = process.env.NODE_ENV === 'Production';
+const isProduction = process.env.NODE_ENV === 'production';
 
 // Serve static files from uploads/ when using local storage (DO credentials not configured)
-const useLocalStorage = !process.env.DO_ACCESS_KEY || process.env.DO_ACCESS_KEY === 'placeholder';
+const useLocalStorage = !process.env.CF_R2_ACCESS_KEY;
 import fs from 'fs';
 import { getDashboardStats } from './adminpanel/dashboard.controller';
 import { addToCart, deleteCart, listCart, checkInCart } from './cart/cart.controller';
@@ -156,6 +157,7 @@ import {
 } from './adminpanel/staffRole.controller';
 import { updateVideoAnalytics } from './stream/videoAnalyticsController';
 import { streamChunkVideo } from './stream/streamController';
+import { getUploadUrl, confirmUpload, startHlsConversion, serveHlsManifest } from './adminpanel/videoUpload.controller';
 
 if (useLocalStorage) {
   const uploadsPath = path.join(process.cwd(), 'uploads');
@@ -169,7 +171,7 @@ if (useLocalStorage) {
 //   ? ['https://skillocraft-front.onrender.com']
 //   : ['http://localhost:3000', 'http://127.0.0.1:3000'];
 const allowedOrigins = isProduction
-  ? [process.env.FRONT_END_URL]
+  ? (process.env.FRONT_END_URL || '').split(',').map(s => s.trim()).filter(Boolean)
   : ['http://localhost:3000', 'http://127.0.0.1:3000'];
 
 // CORS configuration
@@ -742,9 +744,29 @@ app.get('/premium/video/:productId', (req: Request, res: Response, next: NextFun
   streamPremiumVideo(req, res, next);
 });
 
-app.get("/stream/:key",authMiddleware, (req: Request, res: Response, next: NextFunction) => { 
+app.get("/stream/:key", authMiddleware, (req: Request, res: Response, next: NextFunction) => {
   streamChunkVideo(req, res, next);
- });
+});
+
+// HLS manifest — token in query string, no authMiddleware needed
+app.get("/stream/hls/:productId", (req: Request, res: Response, next: NextFunction) => {
+  serveHlsManifest(req as AuthRequest, res, next);
+});
+
+// Direct R2 upload — presigned PUT URL
+app.post("/adminpanel/upload-url", authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  getUploadUrl(req as AuthRequest, res, next);
+});
+
+// Confirm upload done
+app.post("/adminpanel/upload-complete/:productId", authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  confirmUpload(req as AuthRequest, res, next);
+});
+
+// Trigger HLS conversion
+app.post("/adminpanel/products/:productId/start-hls", authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  startHlsConversion(req as AuthRequest, res, next);
+});
 app.post("/analytics",authMiddleware, (req: Request, res: Response, next: NextFunction) => { 
   updateVideoAnalytics(req as AuthRequest, res, next); 
 });
@@ -1108,4 +1130,17 @@ app.delete('/adminpanel/banners/:bannerId', authMiddleware, (req: Request, res: 
 // Google OAuth login
 app.post('/accounts/google-login', (req: Request, res: Response, next: NextFunction) => {
   googleLogin(req, res, next);
+});
+
+// Referral Routes
+app.get('/referral/settings', (req: Request, res: Response, next: NextFunction) => {
+  getReferralSettings(req, res, next);
+});
+
+app.put('/adminpanel/referral-settings', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  updateReferralSettings(req, res, next);
+});
+
+app.get('/referral/my-data', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  getMyReferralData(req, res, next);
 });

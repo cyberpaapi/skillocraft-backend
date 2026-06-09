@@ -4,7 +4,21 @@ import { AuthRequest } from '../types';
 import { uploadVideo, generatePublicUrl, deleteFile } from './upload.middleware';
 import { promisify } from 'util';
 import fs from 'fs';
+import path from 'path';
+import fsExtra from 'fs-extra';
 import { getVideoDurationFromUrl, formatDuration } from '../utils/video-utils';
+import { uploadVideoToBunny, deleteVideoFromBunny } from '../services/bunnyStream';
+import { uploadVideoToVdoCipher, deleteVideoFromVdoCipher } from '../services/vdoCipher';
+import { convertToHLS } from '../services/hlsConverter';
+import { uploadFolderToSpaces } from '../services/spacesUploader';
+import { deleteFolderFromSpaces } from '../utils/deleteFolderFromSpaces';
+
+const BUNNY_GUID_REGEX   = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VDOCIPHER_ID_REGEX  = /^[0-9a-f]{32}$/i;
+
+const vdoCipherEnabled = !!process.env.VDOCIPHER_API_SECRET;
+const bunnyEnabled     = !!(process.env.BUNNY_API_KEY && process.env.BUNNY_LIBRARY_ID && process.env.BUNNY_TOKEN_KEY);
+const r2Enabled        = !!(process.env.CF_R2_ACCESS_KEY && process.env.CF_R2_SECRET_KEY);
 
 const unlinkAsync = promisify(fs.unlink);
 
@@ -144,50 +158,71 @@ export const uploadProductVideo = async (
 
     // Handle file upload
     uploadVideo(req, res, async (err: any) => {
-      if (err) {
-        return res.status(400).json({ error: err.message });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({ error: 'No video file provided' });
-      }
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file) return res.status(400).json({ error: 'No video file provided' });
 
       try {
-        // Delete old video if exists
-        if (product.videoLink) {
-          try {
-            deleteFile(product.videoLink);
-          } catch (error) {
-            console.error('Error deleting old video:', error);
-            // Continue even if deletion of old video fails
+        let videoLink: string;
+
+        if (vdoCipherEnabled) {
+          // ── VdoCipher path (preferred) ─────────────────────────────
+          if (product.videoLink && VDOCIPHER_ID_REGEX.test(product.videoLink)) {
+            deleteVideoFromVdoCipher(product.videoLink).catch(console.error);
           }
+
+          const buffer = req.file.buffer || fs.readFileSync(req.file.path);
+          videoLink = await uploadVideoToVdoCipher(buffer, product.name || 'video');
+          if (req.file.path) unlinkAsync(req.file.path).catch(() => {});
+
+        } else if (bunnyEnabled) {
+          // ── Bunny Stream fallback ──────────────────────────────────
+          if (product.videoLink && BUNNY_GUID_REGEX.test(product.videoLink)) {
+            deleteVideoFromBunny(product.videoLink).catch(console.error);
+          }
+
+          const buffer = req.file.buffer || fs.readFileSync(req.file.path);
+          videoLink = await uploadVideoToBunny(buffer, product.name || 'video');
+          if (req.file.path) unlinkAsync(req.file.path).catch(() => {});
+
+        } else if (r2Enabled) {
+          // ── R2 HLS (file already on disk via multer diskStorage) ──
+          if (product.videoLink && !VDOCIPHER_ID_REGEX.test(product.videoLink) && !BUNNY_GUID_REGEX.test(product.videoLink)) {
+            deleteFolderFromSpaces(product.videoLink.replace('/index.m3u8', '')).catch(console.error);
+          }
+          const sanitizedName   = (product.name || 'video').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+          const videoId         = `${sanitizedName}-${Date.now()}`;
+          const tempRoot        = path.join(process.cwd(), 'temp');
+          const rawPath         = req.file.path ?? path.join(tempRoot, `${videoId}.mp4`);
+          const hlsFolder       = path.join(tempRoot, videoId);
+          if (!req.file.path) {
+            await fsExtra.ensureDir(tempRoot);
+            await fsExtra.writeFile(rawPath, req.file.buffer);
+          }
+          await convertToHLS(rawPath, hlsFolder);
+          const remoteFolder = `videos/products/${videoId}`;
+          await uploadFolderToSpaces(hlsFolder, remoteFolder);
+          await fsExtra.remove(rawPath);
+          await fsExtra.remove(hlsFolder);
+          videoLink = `${remoteFolder}/index.m3u8`;
+
+        } else {
+          // ── Local fallback (dev only) ──────────────────────────────
+          if (product.videoLink) deleteFile(product.videoLink);
+          videoLink = generatePublicUrl(req.file.filename);
         }
 
-        // Generate public URL for the new video
-        const publicUrl = generatePublicUrl(req.file.filename);
-
-        // Update product with new video link
         const updatedProduct = await prisma.product.update({
           where: { id: productId },
-          data: {
-            videoLink: publicUrl,
-          },
+          data: { videoLink },
         });
 
         res.status(200).json({
           message: 'Video uploaded successfully',
-          videoUrl: publicUrl,
+          videoUrl: videoLink,
           product: updatedProduct,
         });
       } catch (error) {
-        // Clean up uploaded file if there was an error
-        if (req.file) {
-          try {
-            await unlinkAsync(req.file.path);
-          } catch (cleanupError) {
-            console.error('Error cleaning up file:', cleanupError);
-          }
-        }
+        if (req.file?.path) unlinkAsync(req.file.path).catch(() => {});
         next(error);
       }
     });
@@ -225,15 +260,15 @@ export const deleteProductVideo = async (
     }
 
     try {
-      // Delete the video file
-      deleteFile(product.videoLink);
+      if (VDOCIPHER_ID_REGEX.test(product.videoLink)) {
+        deleteVideoFromVdoCipher(product.videoLink).catch(console.error);
+      } else if (!BUNNY_GUID_REGEX.test(product.videoLink)) {
+        deleteFile(product.videoLink);
+      }
 
-      // Update product to remove video link by setting it to an empty string
       await prisma.product.update({
         where: { id: productId },
-        data: {
-          videoLink: '', // Set to empty string instead of null
-        },
+        data: { videoLink: '' },
       });
 
       res.status(200).json({ message: 'Video deleted successfully' });
