@@ -9,6 +9,41 @@ const revenueReportSchema = z.object({
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'End date must be in YYYY-MM-DD format'),
 });
 
+// Monthly revenue for a given year (used by admin dashboard)
+export const getMonthlyRevenue = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (req.user?.role !== 'ADMIN') {
+      return res.status(403).json({ status: 0, message: 'Access denied.' });
+    }
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    const orders = await prisma.orders.findMany({
+      where: {
+        status: 'ACTIVE',
+        createdAt: {
+          gte: new Date(`${year}-01-01T00:00:00.000Z`),
+          lte: new Date(`${year}-12-31T23:59:59.999Z`),
+        }
+      },
+      select: { paidAmount: true, createdAt: true }
+    });
+    const monthly = Array.from({ length: 12 }, (_, i) => ({
+      month: i,
+      revenue: 0,
+    }));
+    for (const order of orders) {
+      const m = new Date(order.createdAt).getMonth();
+      monthly[m].revenue += parseFloat(order.paidAmount || '0');
+    }
+    return res.json({ status: 1, data: monthly });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Get day-wise revenue report
 export const getRevenueReport = async (
   req: AuthRequest,

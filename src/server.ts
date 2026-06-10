@@ -81,7 +81,7 @@ import {
   deleteBlog 
 } from './adminpanel/blog.controller';
 import { clearDatabase, checkClearDatabase } from './adminpanel/clearDatabase.controller';
-import { getRevenueReport } from './adminpanel/revenue.controller';
+import { getRevenueReport, getMonthlyRevenue } from './adminpanel/revenue.controller';
 import { 
   getBanners,
   getBannerById,
@@ -721,6 +721,11 @@ app.get('/adminpanel/orders', authMiddleware, (req: Request, res: Response, next
 // Admin Revenue Report Route (Admin Only - Requires Authentication)
 app.get('/adminpanel/revenue', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
   getRevenueReport(req as AuthRequest, res, next);
+});
+
+// Monthly revenue by year (for admin dashboard chart)
+app.get('/adminpanel/monthly-revenue', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  getMonthlyRevenue(req as AuthRequest, res, next);
 });
 
 // Public video streaming (unlimited access)
