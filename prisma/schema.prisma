@@ -145,21 +145,37 @@ model Customer {
   wishlist  Wishlist[]
   review    Review[]
   orders    Orders[]
-  
+
   // As referrer - customers this user has referred
   referredCustomers Referal[] @relation("Referrer")
-  
+
   // As referred - who referred this customer
   referredBy       Referal?  @relation("Referred")
-  
+
   // Unique referral code for this customer
   referalCode      String    @unique
-  
+
+  // Payout UPI ID
+  upiId            String?
+  payoutRequests   PayoutRequest[]
+
   discountCoupon      DiscountCoupon[]
   EventRegistration   EventRegistration[]
   status              ActiveStatus @default(ACTIVE)
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
+}
+
+model PayoutRequest {
+  id         String   @id @unique @default(uuid())
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String
+  amount     Float
+  upiId      String
+  status     String   @default("PENDING")
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Address {

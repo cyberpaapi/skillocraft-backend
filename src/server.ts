@@ -124,7 +124,7 @@ import { listCustomers, listAdmins, listStaff, getCustomerOverview } from './adm
 import { listEvents, getEventById, registerForEvent, checkEventRegistered, getMyRegistrations } from './events/event.controller';
 import { createEvent, updateEvent, deleteEvent, listEventsAdmin } from './adminpanel/event.controller';
 import { listBanners, createBanner as createBannerAdmin, updateBanner as updateBannerAdmin, deleteBanner as deleteBannerAdmin } from './adminpanel/banner.controller';
-import { getReferralSettings, updateReferralSettings, getMyReferralData } from './referral/referral.controller';
+import { getReferralSettings, updateReferralSettings, getMyReferralData, updateUpiId, requestPayout, getPayoutRequests, updatePayoutRequest } from './referral/referral.controller';
 
 dotenv.config();
 const app = express();
@@ -1140,4 +1140,20 @@ app.put('/adminpanel/referral-settings', authMiddleware, (req: AuthRequest, res:
 
 app.get('/referral/my-data', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
   getMyReferralData(req, res, next);
+});
+
+app.patch('/referral/upi-id', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  updateUpiId(req, res, next);
+});
+
+app.post('/referral/payout-request', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  requestPayout(req, res, next);
+});
+
+app.get('/adminpanel/payout-requests', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  getPayoutRequests(req, res, next);
+});
+
+app.patch('/adminpanel/payout-requests/:id', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  updatePayoutRequest(req, res, next);
 });
