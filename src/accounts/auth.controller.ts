@@ -377,9 +377,9 @@ export const refreshTokens = async (
 
     // Find user and verify stored refresh token
     const user = await prisma.user.findUnique({
-      where: { 
-        id: decoded.userId,
-        refreshToken: refreshToken 
+      where: {
+        id: decoded.id,
+        refreshToken: refreshToken
       }
     });
 

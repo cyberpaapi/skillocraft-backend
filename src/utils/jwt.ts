@@ -1,11 +1,5 @@
 import jwt, { SignOptions } from 'jsonwebtoken';
-import { UserResponse } from '../types';
-
-interface TokenPayload {
-  userId: string;
-  email: string;
-  role: string;
-}
+import { TokenPayload, UserResponse } from '../types';
 
 export const generateTokens = (user: UserResponse) => {
   // Ensure JWT secrets are defined
@@ -17,14 +11,14 @@ export const generateTokens = (user: UserResponse) => {
     throw new Error('JWT refresh secret is not defined');
   }
 
-  const accessTokenPayload: TokenPayload = {
-    userId: user.id,
+  const accessTokenPayload = {
+    id: user.id,
     email: user.email,
     role: user.role
   };
 
-  const refreshTokenPayload: TokenPayload = {
-    userId: user.id,
+  const refreshTokenPayload = {
+    id: user.id,
     email: user.email,
     role: user.role
   };
