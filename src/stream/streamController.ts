@@ -22,7 +22,7 @@ export const streamChunkVideo = async (req: AuthRequest, res: Response, next: Ne
         try {
           const [user, customer] = await Promise.all([
             prisma.user.findUnique({ where: { id: req.user.id }, select: { email: true } }),
-            prisma.customer.findUnique({ where: { userId: req.user.id }, select: { name: true } }),
+            prisma.customer.findFirst({ where: { userId: req.user.id }, select: { name: true } }),
           ]);
           if (user || customer) watermark = { name: customer?.name ?? undefined, email: user?.email ?? undefined };
         } catch { /* non-critical */ }

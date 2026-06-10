@@ -329,10 +329,7 @@ export const updateCourse = async (
       if (courseData.image) {
         //const oldImagePath = path.join(process.cwd(), 'public', courseData.image);
         await deleteFromSpaces(courseData.image);
-        imageUrl = await uploadToSpaces(
-        req.file,
-        'images/courses'
-      );
+        imageUrl = await uploadFile(req.file, 'skillocraft/courses', 'images', 'image');
       }
       //imageUrl = `/uploads/images/courses/${req.file.filename}`;
     }
