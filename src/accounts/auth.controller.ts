@@ -162,6 +162,7 @@ export const registerUser = async (
                   paidAmount: '0',
                   transactionId: `free-${userProfile.id}-${course.id}`,
                   TransactionType: 'CREDIT',
+                  paymentType: 'ONLINE',
                   status: 'ACTIVE',
                 },
               });
