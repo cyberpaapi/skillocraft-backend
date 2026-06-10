@@ -300,7 +300,7 @@ export const loginUser = async (
                   course: { connect: [{ id: course.id }] },
                   totalAmount: '0', paidAmount: '0',
                   transactionId: `free-${customer.id}-${course.id}`,
-                  TransactionType: 'CREDIT', status: 'ACTIVE',
+                  TransactionType: 'CREDIT', paymentType: 'ONLINE', status: 'ACTIVE',
                 },
               });
             }
