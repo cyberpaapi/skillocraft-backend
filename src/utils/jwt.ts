@@ -30,7 +30,7 @@ export const generateTokens = (user: UserResponse) => {
   };
 
   const accessTokenOptions: SignOptions = {
-    expiresIn: '15m', // Short-lived access token
+    expiresIn: '1d',
     issuer: 'skillocraft-backend'
   };
 

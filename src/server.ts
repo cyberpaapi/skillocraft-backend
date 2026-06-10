@@ -159,12 +159,9 @@ import { updateVideoAnalytics } from './stream/videoAnalyticsController';
 import { streamChunkVideo } from './stream/streamController';
 import { getUploadUrl, confirmUpload, startHlsConversion, serveHlsManifest } from './adminpanel/videoUpload.controller';
 
-if (useLocalStorage) {
-  const uploadsPath = path.join(process.cwd(), 'uploads');
-  if (!fs.existsSync(uploadsPath)) fs.mkdirSync(uploadsPath, { recursive: true });
-  app.use('/uploads', express.static(uploadsPath));
-  console.log('Local storage mode: serving /uploads as static files');
-}
+const uploadsPath = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsPath)) fs.mkdirSync(uploadsPath, { recursive: true });
+app.use('/uploads', express.static(uploadsPath));
 
 // For development, explicitly allow the frontend origin
 // const allowedOrigins = isProduction

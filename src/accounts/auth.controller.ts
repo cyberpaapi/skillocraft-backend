@@ -146,6 +146,29 @@ export const registerUser = async (
           throw new Error('Failed to generate a unique referral code after multiple attempts');
         }
 
+        // Auto-enroll in all free courses (price = "0")
+        if (userProfile) {
+          try {
+            const freeCourses = await prisma.course.findMany({
+              where: { price: '0', status: 'ACTIVE' },
+              select: { id: true },
+            });
+            for (const course of freeCourses) {
+              await prisma.orders.create({
+                data: {
+                  customer: { connect: { id: userProfile.id } },
+                  course: { connect: [{ id: course.id }] },
+                  totalAmount: '0',
+                  paidAmount: '0',
+                  transactionId: `free-${userProfile.id}-${course.id}`,
+                  TransactionType: 'CREDIT',
+                  status: 'ACTIVE',
+                },
+              });
+            }
+          } catch { /* non-critical — don't fail registration */ }
+        }
+
         // Track referral if a referral code was provided at signup
         const incomingReferralCode = req.body.referralCode as string | undefined;
         if (incomingReferralCode && userProfile) {
@@ -260,6 +283,30 @@ export const loginUser = async (
     if (!isPasswordValid) {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
+    }
+
+    // Auto-enroll customer in any free courses they haven't enrolled in yet
+    if (user.role === 'CUSTOMER') {
+      try {
+        const customer = await prisma.customer.findFirst({ where: { userId: user.id } });
+        if (customer) {
+          const freeCourses = await prisma.course.findMany({ where: { price: '0', status: 'ACTIVE' }, select: { id: true } });
+          for (const course of freeCourses) {
+            const existing = await prisma.orders.findFirst({ where: { customerId: customer.id, course: { some: { id: course.id } } } });
+            if (!existing) {
+              await prisma.orders.create({
+                data: {
+                  customer: { connect: { id: customer.id } },
+                  course: { connect: [{ id: course.id }] },
+                  totalAmount: '0', paidAmount: '0',
+                  transactionId: `free-${customer.id}-${course.id}`,
+                  TransactionType: 'CREDIT', status: 'ACTIVE',
+                },
+              });
+            }
+          }
+        }
+      } catch { /* non-critical */ }
     }
 
     // Extract name based on role
