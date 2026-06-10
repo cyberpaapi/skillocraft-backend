@@ -464,6 +464,7 @@ export const getAllOrdersForAdmin = async (
         customer: {
           select: {
             id: true,
+            name: true,
             user: {
               select: {
                 id: true,
