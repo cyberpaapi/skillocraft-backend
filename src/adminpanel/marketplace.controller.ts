@@ -104,7 +104,7 @@ export const updateMarketplaceProduct = async (req: AuthRequest, res: Response, 
       }
     }
 
-    let highlights = existing.highlights;
+    let highlights: object[] = Array.isArray(existing.highlights) ? existing.highlights as object[] : [];
     if (req.body.highlights) {
       try { highlights = JSON.parse(req.body.highlights); } catch {}
     }
