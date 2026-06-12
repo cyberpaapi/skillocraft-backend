@@ -451,6 +451,9 @@ export const getAllOrdersForAdmin = async (
             id: true,
             name: true,
             price: true,
+            category: {
+              select: { name: true },
+            },
           },
         },
         discountCoupon: {

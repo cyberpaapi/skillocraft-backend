@@ -19,5 +19,6 @@ export const uploadToSpaces = async (
 
   await spacesClient.send(command);
 
-  return fileName; // store the key; presigned URL is generated at access time
+  const publicUrl = process.env.CF_R2_PUBLIC_URL;
+  return publicUrl ? `${publicUrl.replace(/\/$/, '')}/${fileName}` : fileName;
 };

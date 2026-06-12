@@ -20,23 +20,39 @@ export const getMonthlyRevenue = async (
       return res.status(403).json({ status: 0, message: 'Access denied.' });
     }
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
-    const orders = await prisma.orders.findMany({
-      where: {
-        status: 'ACTIVE',
-        createdAt: {
-          gte: new Date(`${year}-01-01T00:00:00.000Z`),
-          lte: new Date(`${year}-12-31T23:59:59.999Z`),
-        }
-      },
-      select: { paidAmount: true, createdAt: true }
-    });
+    const dateRange = {
+      gte: new Date(`${year}-01-01T00:00:00.000Z`),
+      lte: new Date(`${year}-12-31T23:59:59.999Z`),
+    };
+
+    const [orders, events] = await Promise.all([
+      prisma.orders.findMany({
+        where: { status: 'ACTIVE', createdAt: dateRange },
+        select: { paidAmount: true, createdAt: true }
+      }),
+      prisma.eventRegistration.findMany({
+        where: { status: 'ACTIVE', createdAt: dateRange },
+        select: { amount: true, createdAt: true }
+      }),
+    ]);
+
     const monthly = Array.from({ length: 12 }, (_, i) => ({
       month: i,
+      courseRevenue: 0,
+      eventRevenue: 0,
       revenue: 0,
     }));
     for (const order of orders) {
       const m = new Date(order.createdAt).getMonth();
-      monthly[m].revenue += parseFloat(order.paidAmount || '0');
+      const amt = parseFloat(order.paidAmount || '0');
+      monthly[m].courseRevenue += amt;
+      monthly[m].revenue += amt;
+    }
+    for (const event of events) {
+      const m = new Date(event.createdAt).getMonth();
+      const amt = parseFloat(event.amount || '0');
+      monthly[m].eventRevenue += amt;
+      monthly[m].revenue += amt;
     }
     return res.json({ status: 1, data: monthly });
   } catch (error) {
