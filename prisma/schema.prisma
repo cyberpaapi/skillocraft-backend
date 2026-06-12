@@ -575,3 +575,22 @@ model EventRegistration {
   updatedAt DateTime     @updatedAt
   @@unique([eventId, customerId])
 }
+
+model MarketplaceProduct {
+  id             String       @id @unique @default(uuid())
+  name           String
+  description    String
+  price          String
+  originalPrice  String       @default("")
+  discount       String       @default("0")
+  category       String
+  images         String[]
+  highlights     Json         @default("[]")
+  specifications String?
+  importantNote  String?
+  deliveryInfo   String?
+  status         ActiveStatus @default(ACTIVE)
+  createdBy      String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}

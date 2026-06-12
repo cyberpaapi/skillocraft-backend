@@ -242,6 +242,12 @@ export const uploadSuccessStoryFiles = multer({
 //   limits: { fileSize: uploadPaths.course.maxSize },
 // }).single('image');
 
+export const uploadMarketplaceImages = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: imageFileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).fields([{ name: 'images', maxCount: 6 }]);
+
 // File filter for PDFs
 const pdfFileFilter: multer.Options['fileFilter'] = (
   req: Request,

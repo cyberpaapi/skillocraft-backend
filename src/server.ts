@@ -116,6 +116,7 @@ import {
   uploadCreatorImage,
   uploadSuccessStoryFiles,
   uploadEventImage,
+  uploadMarketplaceImages,
 } from './middleware/upload.middleware';
 import { createAuthor, deleteAuthor, getAuthorById, getAuthors, updateAuthor } from './adminpanel/author.controller';
 import { createCreator, deleteCreator, getCreatorById, getCreators, updateCreator } from './adminpanel/creator.controller';
@@ -125,6 +126,7 @@ import { listEvents, getEventById, registerForEvent, checkEventRegistered, getMy
 import { createEvent, updateEvent, deleteEvent, listEventsAdmin } from './adminpanel/event.controller';
 import { listBanners, createBanner as createBannerAdmin, updateBanner as updateBannerAdmin, deleteBanner as deleteBannerAdmin } from './adminpanel/banner.controller';
 import { getReferralSettings, updateReferralSettings, getMyReferralData, updateUpiId, requestPayout, getPayoutRequests, updatePayoutRequest } from './referral/referral.controller';
+import { createMarketplaceProduct, listMarketplaceProducts, getMarketplaceProduct, updateMarketplaceProduct, deleteMarketplaceProduct } from './adminpanel/marketplace.controller';
 
 dotenv.config();
 const app = express();
@@ -1161,4 +1163,21 @@ app.get('/adminpanel/payout-requests', authMiddleware, (req: AuthRequest, res: R
 
 app.patch('/adminpanel/payout-requests/:id', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
   updatePayoutRequest(req, res, next);
+});
+
+// Marketplace Routes
+app.get('/marketplace-products', (req: Request, res: Response, next: NextFunction) => {
+  listMarketplaceProducts(req, res, next);
+});
+app.get('/marketplace-products/:id', (req: Request, res: Response, next: NextFunction) => {
+  getMarketplaceProduct(req, res, next);
+});
+app.post('/adminpanel/marketplace-products', authMiddleware, uploadMarketplaceImages, (req: Request, res: Response, next: NextFunction) => {
+  createMarketplaceProduct(req as AuthRequest, res, next);
+});
+app.put('/adminpanel/marketplace-products/:id', authMiddleware, uploadMarketplaceImages, (req: Request, res: Response, next: NextFunction) => {
+  updateMarketplaceProduct(req as AuthRequest, res, next);
+});
+app.delete('/adminpanel/marketplace-products/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  deleteMarketplaceProduct(req as AuthRequest, res, next);
 });
