@@ -165,6 +165,25 @@ const uploadsPath = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsPath)) fs.mkdirSync(uploadsPath, { recursive: true });
 app.use('/uploads', express.static(uploadsPath));
 
+// R2 image proxy — serves any R2 object through the API so no public bucket URL is needed
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { spacesClient } from './config/spaces';
+app.get('/r2/*', async (req: Request, res: Response) => {
+  const key = (req.params as any)[0] as string;
+  if (!key) { res.status(400).send('Missing key'); return; }
+  try {
+    const cmd = new GetObjectCommand({ Bucket: process.env.CF_R2_BUCKET!, Key: key });
+    const obj = await spacesClient.send(cmd);
+    res.setHeader('Content-Type', obj.ContentType || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const chunks: Buffer[] = [];
+    for await (const chunk of obj.Body as any) chunks.push(Buffer.from(chunk));
+    res.send(Buffer.concat(chunks));
+  } catch {
+    res.status(404).send('Not found');
+  }
+});
+
 // For development, explicitly allow the frontend origin
 // const allowedOrigins = isProduction
 //   ? ['https://skillocraft-front.onrender.com']

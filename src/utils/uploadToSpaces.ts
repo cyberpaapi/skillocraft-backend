@@ -19,6 +19,7 @@ export const uploadToSpaces = async (
 
   await spacesClient.send(command);
 
-  const publicUrl = process.env.CF_R2_PUBLIC_URL;
-  return publicUrl ? `${publicUrl.replace(/\/$/, '')}/${fileName}` : fileName;
+  // Return a backend-relative proxy path — served via GET /r2/* route.
+  // This works without CF_R2_PUBLIC_URL or NEXT_PUBLIC_R2_PUBLIC_URL.
+  return `/r2/${fileName}`;
 };

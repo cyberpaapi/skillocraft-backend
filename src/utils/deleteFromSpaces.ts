@@ -5,10 +5,12 @@ export const deleteFromSpaces = async (fileUrl: string) => {
   try {
     const bucket = process.env.CF_R2_BUCKET!;
 
-    // fileUrl may be a full URL (any domain) or a plain key — extract just the path key
+    // fileUrl may be a full URL, a /r2/key proxy path, or a plain key
     const key = fileUrl.startsWith('http')
-      ? new URL(fileUrl).pathname.replace(/^\//, '')
-      : fileUrl;
+      ? new URL(fileUrl).pathname.replace(/^\/r2\//, '').replace(/^\//, '')
+      : fileUrl.startsWith('/r2/')
+        ? fileUrl.slice(4)
+        : fileUrl;
 
     if (!key) return;
 
