@@ -34,130 +34,29 @@ export const createAuthor = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  // Check if file exists
-  if (!req.file) {
-    res.status(400).json({
-      status: 0,
-      message: 'Image is required',
-      error: 'Please upload a author image'
-    });
-    return;
-  }
-
   try {
-    // Validate required fields
-    const requiredFields = ['name', 'description'];
-    const missingFields = requiredFields.filter(field => !req.body[field]);
-    
-    if (missingFields.length > 0) {
-      //cleanupUploadedFile(req.file.path);
-      res.status(400).json({
-        status: 0,
-        message: 'Missing required fields',
-        error: `The following fields are required: ${missingFields.join(', ')}`,
-        fields: missingFields
-      });
-      return;
-    }
-
-    // Ensure user is admin
     if (req.user?.role !== 'ADMIN') {
-      //cleanupUploadedFile(req.file.path);
-      res.status(403).json({ 
-        status: 0,
-        message: 'Unauthorized to create course' 
-      });
+      res.status(403).json({ status: 0, message: 'Unauthorized' });
       return;
     }
 
-    // Parse and validate the request body
-    const { error: validationError, data: validatedData } = createAuthorRequestSchema.safeParse({
-      ...req.body,
-      subCategoryId: req.body.subCategoryId === 'undefined' ? undefined : req.body.subCategoryId,
-      price: req.body.price ? String(req.body.price) : undefined,
-      longDesription: req.body.longDescription || '' // Map longDescription to longDesription
+    let imageLink = '';
+    if (req.file) {
+      imageLink = await uploadToSpaces(req.file, 'images/author');
+    }
+
+    const author = await prisma.author.create({
+      data: {
+        name: req.body.name || 'Unnamed Author',
+        description: req.body.description || '',
+        imageLink,
+        status: ActiveStatus.ACTIVE,
+      },
     });
 
-    if (validationError) {
-      //cleanupUploadedFile(req.file.path);
-      res.status(400).json({
-        status: 0,
-        message: 'Validation error',
-        errors: validationError.errors.map(err => ({
-          path: err.path.join('.'),
-          message: err.message
-        }))
-      });
-      return;
-    }
-
-    // First, upload the image and get the image URL
-    //const imageUrl = `/uploads/images/author/${req.file.filename}`;
-    const imageUrl = await uploadToSpaces(
-      req.file,
-      'images/author'
-    );
-    
-    try {
-      // Ensure we have a valid user
-
-      console.log('Request body:', JSON.stringify(validatedData, null, 2));
-      
-      // Create the course with the correct field names from Prisma schema
-      const author = await prisma.author.create({   
-        data: {
-          name: validatedData.name,
-          description: validatedData.description,
-          imageLink: imageUrl,
-          status: ActiveStatus.ACTIVE,
-        }
-      });
-
-      // Create the response data with proper typing
-      const responseData = {
-        ...author,
-      };
-
-      res.status(201).json({
-        status: 1,
-        message: 'Author created successfully',
-        data: responseData
-      });
-    } catch (error) {
-      console.error('Error creating course:', error);
-      
-      // Clean up the uploaded file if there was an error
-      // if (req.file?.path) {
-      //   cleanupUploadedFile(req.file.path);
-      // }
-      
-      if (error instanceof ZodError) {
-        res.status(400).json({ 
-          status: 0,
-          message: 'Validation error',
-          errors: error.errors 
-        });
-      } else if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        res.status(400).json({
-          status: 0,
-          message: 'Database error',
-          error: error.message
-        });
-      } else {
-        res.status(500).json({
-          status: 0,
-          message: 'Internal server error',
-          error: error instanceof Error ? error.message : 'An unexpected error occurred'
-        });
-      }
-    }
+    res.status(201).json({ status: 1, message: 'Author created successfully', data: author });
   } catch (error) {
-    console.error('Unexpected error in createCourse:', error);
-    res.status(500).json({
-      status: 0,
-      message: 'Internal server error',
-      error: 'An unexpected error occurred while processing your request'
-    });
+    next(error);
   }
 };
 
