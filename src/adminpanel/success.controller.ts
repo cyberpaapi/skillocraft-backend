@@ -49,7 +49,7 @@ export const createSuccessStory = async (
     // Debug log to check the uploaded files
     console.log('Uploaded files:', files);
     
-    if (!files?.image?.[0]?.path || !files?.coverPhoto?.[0]?.path) {
+    if (!files?.image?.[0] || !files?.coverPhoto?.[0]) {
       // Clean up any uploaded files if one is missing
       // if (files?.image?.[0]?.path) await fs.promises.unlink(files.image[0].path).catch(console.error);
       // if (files?.coverPhoto?.[0]?.path) await fs.promises.unlink(files.coverPhoto[0].path).catch(console.error);
