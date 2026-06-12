@@ -322,16 +322,22 @@ export const updateCourse = async (
       return;
     }
 
-    // Handle file upload if new image is provided
+    // Handle file uploads (image and/or teaserVideo)
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    const imageFile = files?.image?.[0] ?? (req.file ?? null);
+    const teaserVideoFile = files?.teaserVideo?.[0] ?? null;
+
     let imageUrl = courseData.image || '';
-    if (req.file) {
-      // Delete old image if it exists
-      if (courseData.image) {
-        //const oldImagePath = path.join(process.cwd(), 'public', courseData.image);
-        await deleteFromSpaces(courseData.image);
-        imageUrl = await uploadFile(req.file, 'skillocraft/courses', 'images', 'image');
-      }
-      //imageUrl = `/uploads/images/courses/${req.file.filename}`;
+    if (imageFile) {
+      if (courseData.image) await deleteFromSpaces(courseData.image);
+      imageUrl = await uploadFile(imageFile, 'images/courses', 'images', 'image');
+    }
+
+    const existingTeaser = (existingCourse as any).teaserVideo || '';
+    let teaserVideoUrl = existingTeaser;
+    if (teaserVideoFile) {
+      if (existingTeaser) await deleteFromSpaces(existingTeaser);
+      teaserVideoUrl = await uploadFile(teaserVideoFile, 'videos/courses', 'videos', 'video');
     }
 
     // Prepare update data
@@ -340,6 +346,7 @@ export const updateCourse = async (
       shortDescription: req.body.shortDescription || courseData.shortDescription,
       longDesription: req.body.longDescription || courseData.longDesription || undefined,
       image: imageUrl,
+      teaserVideo: teaserVideoUrl,
       language: req.body.language || courseData.language,
       status: (req.body.status as ActiveStatus) || courseData.status,
       featured: req.body.featured !== undefined ? req.body.featured === 'true' : undefined,

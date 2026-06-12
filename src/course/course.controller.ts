@@ -125,13 +125,17 @@ export const getCourseDetails = async (
             name: true,
             discription: true,
             videoLink: true,
+            videoStatus: true,
+            lessonType: true,
+            textContent: true,
+            order: true,
             status: true,
             createdBy: true,
             createdAt: true,
             updatedAt: true
           },
-          orderBy: { 
-            createdAt: 'asc' 
+          orderBy: {
+            order: 'asc'
           }
         },
         review: {
@@ -277,10 +281,14 @@ export const getCourseDetails = async (
         products: productsWithDuration.map(p => ({
           id: p.id,
           name: p.name,
-          description: p.discription, // Note: Typo in schema (discription vs description)
+          description: p.discription,
           videoLink: p.videoLink,
-          duration: p.duration, // Video duration in seconds
-          formattedDuration: p.formattedDuration, // Formatted duration (HH:MM:SS)
+          videoStatus: p.videoStatus,
+          lessonType: p.lessonType,
+          textContent: p.textContent,
+          order: p.order,
+          duration: p.duration,
+          formattedDuration: p.formattedDuration,
           status: p.status,
           createdBy: p.createdBy,
           createdAt: p.createdAt,

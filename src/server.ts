@@ -68,7 +68,7 @@ import {
   getCustomerCourseProgress,
   getCustomerCourseAnalytics
 } from './analytics/video-analytics.controller';
-import { createProduct } from './adminpanel/product.controller';
+import { createProduct, reorderProducts } from './adminpanel/product.controller';
 import { 
   getBlogs, 
   getBlogById 
@@ -548,10 +548,9 @@ app.get('/course/product/:productId', (req: Request, res: Response, next: NextFu
   getProductDetails(req, res, next);
 });
 
-app.put('/adminpanel/courses/:courseId', 
+app.put('/adminpanel/courses/:courseId',
   authMiddleware,
-  uploadCourseImage,
-  // File upload middleware
+  uploadCourseFiles,
   (req: Request, res: Response, next: NextFunction) => {
     updateCourse(req, res, next);
   }
@@ -561,6 +560,14 @@ app.delete('/adminpanel/courses/:courseId',
   authMiddleware, 
   (req: Request, res: Response, next: NextFunction) => {
     deleteCourse(req as AuthRequest, res, next);
+  }
+);
+
+// Reorder lessons within a course
+app.patch('/adminpanel/products/reorder',
+  authMiddleware,
+  (req: Request, res: Response, next: NextFunction) => {
+    reorderProducts(req as AuthRequest, res, next);
   }
 );
 

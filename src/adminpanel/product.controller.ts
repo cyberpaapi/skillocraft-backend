@@ -162,6 +162,8 @@ export const createProduct = async (
     const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) return res.status(404).json({ status: 0, message: 'Course not found' });
 
+    const existingCount = await prisma.product.count({ where: { courseId } });
+
     const product = await prisma.product.create({
       data: {
         name,
@@ -171,6 +173,7 @@ export const createProduct = async (
         videoStatus: 'idle',
         textContent: textContent || null,
         status: status || 'ACTIVE',
+        order: existingCount,
         course: { connect: { id: courseId } },
         createdBy: req.user?.email || '',
       },
@@ -181,6 +184,31 @@ export const createProduct = async (
   } catch (error) {
     console.error('Product creation error:', error);
     return res.status(500).json({ status: 0, message: 'Failed to create lesson' });
+  }
+};
+
+export const reorderProducts = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  if (req.user?.role !== 'ADMIN') {
+    return res.status(403).json({ status: 0, message: 'Unauthorized' });
+  }
+  const { items } = req.body as { items: { id: string; order: number }[] };
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ status: 0, message: 'items array required' });
+  }
+  try {
+    await prisma.$transaction(
+      items.map(({ id, order }) =>
+        prisma.product.update({ where: { id }, data: { order } })
+      )
+    );
+    return res.json({ status: 1, message: 'Order saved' });
+  } catch (error) {
+    console.error('Reorder error:', error);
+    return res.status(500).json({ status: 0, message: 'Failed to reorder lessons' });
   }
 };
 
