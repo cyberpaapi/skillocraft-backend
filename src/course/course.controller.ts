@@ -298,8 +298,9 @@ export const getCourseDetails = async (
           count: reviews?.length || 0,
           data: reviews?.map(review => ({
             id: review.id,
-            rating: review.ratting,
-            comment: review.details,
+            ratting: review.ratting,
+            details: review.details,
+            reviewerName: (review as any).reviewerName || null,
             customer: review.customer,
             createdAt: review.createdAt,
             updatedAt: review.updatedAt
