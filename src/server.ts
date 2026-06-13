@@ -128,14 +128,17 @@ import { listBanners, createBanner as createBannerAdmin, updateBanner as updateB
 import { getReferralSettings, updateReferralSettings, getMyReferralData, updateUpiId, requestPayout, getPayoutRequests, updatePayoutRequest } from './referral/referral.controller';
 import { createMarketplaceProduct, listMarketplaceProducts, getMarketplaceProduct, updateMarketplaceProduct, deleteMarketplaceProduct } from './adminpanel/marketplace.controller';
 import { createMarketplaceOrder, listMarketplaceOrders, updateMarketplaceOrderStatus } from './adminpanel/marketplaceOrder.controller';
-import { createCourseRazorpayOrder, verifyCoursePayment, createMarketplaceRazorpayOrder, verifyMarketplacePayment } from './razorpay/razorpay.controller';
+import { createCourseRazorpayOrder, verifyCoursePayment, createMarketplaceRazorpayOrder, verifyMarketplacePayment, razorpayWebhook } from './razorpay/razorpay.controller';
 
 dotenv.config();
 const app = express();
 const PORT: number = parseInt(process.env.PORT || '4000');
 
 // Middleware
-app.use(express.json());
+// Capture raw body for Razorpay webhook signature verification
+app.use(express.json({
+  verify: (req: any, res, buf) => { req.rawBody = buf; }
+}));
 app.use(express.urlencoded({ extended: true }));
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -1223,6 +1226,11 @@ app.put('/adminpanel/marketplace-products/:id', authMiddleware, uploadMarketplac
 });
 app.delete('/adminpanel/marketplace-products/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
   deleteMarketplaceProduct(req as AuthRequest, res, next);
+});
+
+// Razorpay webhook (no auth — called by Razorpay servers)
+app.post('/razorpay/webhook', (req: Request, res: Response) => {
+  razorpayWebhook(req, res);
 });
 
 // Razorpay
