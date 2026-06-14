@@ -26,7 +26,7 @@ export const createFeatureGallery = async (
   let filePath: string | undefined;
   
   try {
-    const { description } = req.body;
+    const { description, linkUrl } = req.body;
     const imageFile = req.file;
     const userId = req.user?.email;
 
@@ -59,6 +59,7 @@ export const createFeatureGallery = async (
       data: {
         imageLink: imageUrl,
         description: description || null,
+        linkUrl: linkUrl || null,
         status: 'ACTIVE' as ActiveStatus
       }
     });
@@ -163,7 +164,7 @@ export const updateFeatureGallery = async (
   
   try {
     const { id } = req.params;
-    const { description, status } = req.body;
+    const { description, status, linkUrl } = req.body;
     const imageFile = req.file;
 
     // Check if gallery exists
@@ -185,7 +186,8 @@ export const updateFeatureGallery = async (
     // Prepare update data
     const updateData: any = {
       description: description !== undefined ? description : existingGallery.description,
-      status: status !== undefined ? status : existingGallery.status
+      status: status !== undefined ? status : existingGallery.status,
+      linkUrl: linkUrl !== undefined ? (linkUrl || null) : existingGallery.linkUrl,
     };
 
     // If a new image is uploaded

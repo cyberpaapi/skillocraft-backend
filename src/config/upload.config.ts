@@ -7,7 +7,7 @@ dotenv.config();
 const BASE_UPLOAD_DIR = 'uploads';
 
 // File size limits (in bytes)
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_IMAGE_SIZE = 50 * 1024 * 1024; // 50MB
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024 * 1024; // 50GB
 
 // Allowed file types

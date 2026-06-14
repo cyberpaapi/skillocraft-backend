@@ -161,17 +161,14 @@ export const createCourse = async (
   ? validatedData.featured === 'true' || validatedData.featured === '1'
   : Boolean(validatedData.featured);
 
-      const saveFile = async (file: Express.Multer.File, folder: string, localSubdir: string): Promise<string> =>
-        uploadFile(file, folder, localSubdir, 'image');
-
-      const imageUrl = imageFile ? await saveFile(imageFile, 'images/courses', 'images/courses') : '';
+      const imageUrl = imageFile ? await uploadFile(imageFile, 'images/courses', 'images/courses', 'image') : '';
 
       if (teaserVideoFile) {
-        teaserVideoUrl = await saveFile(teaserVideoFile, 'videos/courses', 'videos/courses');
+        teaserVideoUrl = await uploadFile(teaserVideoFile, 'videos/courses', 'videos/courses', 'video');
       }
 
       if (pdfFile) {
-        pdfLink = await saveFile(pdfFile, 'pdfs/courses', 'pdfs/courses');
+        pdfLink = await uploadFile(pdfFile, 'pdfs/courses', 'pdfs/courses', 'raw');
       }
 
       // Create the course with the correct field names from Prisma schema

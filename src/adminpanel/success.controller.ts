@@ -228,7 +228,7 @@ export const listSuccessStory = async (
     }
     
     // Transform and validate the response data
-    const responseData = 
+    const responseData =
       successStory.map(successStory => ({
         id: successStory.id,
         name: successStory.name,
@@ -238,6 +238,7 @@ export const listSuccessStory = async (
         imageLink: successStory.imageLink,
         coverPhoto: successStory.coverPhoto,
         status: successStory.status,
+        createdAt: successStory.createdAt,
         category: successStory.category
       }));
     
