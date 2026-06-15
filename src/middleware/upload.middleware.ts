@@ -371,6 +371,20 @@ export const uploadCourseTeaserVideo = courseTeaserVideoStorageUpload.single('vi
 //   limits: { fileSize: uploadPaths.courseTeaserVideo.maxSize },
 // }).single('teaserVideo');
 
+// Course download file upload (any file type, up to 50MB)
+export const uploadCourseDownloadFile = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+}).single('file');
+
+// Settings video upload
+const settingsVideoUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: videoFileFilter,
+  limits: { fileSize: 500 * 1024 * 1024 },
+});
+export const uploadSettingsVideo = settingsVideoUpload.single('video');
+
 // Helper functions
 export const getImageUrl = (filename: string, type: 'category' | 'course' | 'blog' = 'category'): string => {
   const config = type === 'category' ? uploadPaths.category : type === 'course' ? uploadPaths.course : uploadPaths.blog; 

@@ -169,6 +169,24 @@ export const getCourseFAQById = async (
   }
 };
 
+export const deleteCourseFAQ = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (req.user?.role !== 'ADMIN') {
+      res.status(403).json({ status: 0, message: 'Unauthorized' });
+      return;
+    }
+    const { id } = req.params;
+    await prisma.courseFAQ.delete({ where: { id } });
+    res.json({ status: 1, message: 'FAQ deleted' });
+  } catch (error) {
+    res.status(500).json({ status: 0, message: 'Failed to delete FAQ' });
+  }
+};
+
 export const getCourseFAQByCourseId = async (
   req: Request,
   res: Response,

@@ -31,8 +31,8 @@ import {
   getCourseDetails,
   getCourseCustomers
 } from './course/course.controller';
-import { createReview } from './course/review.controller';
-import { createCourseFAQ, listCourseFAQs, getCourseFAQById, getCourseFAQByCourseId } from './adminpanel/courseFaq.controller';
+import { createReview, adminCreateReview, deleteReview } from './course/review.controller';
+import { createCourseFAQ, listCourseFAQs, getCourseFAQById, getCourseFAQByCourseId, deleteCourseFAQ } from './adminpanel/courseFaq.controller';
 import { 
   createGeneralFAQ, 
   listGeneralFAQs, 
@@ -68,7 +68,7 @@ import {
   getCustomerCourseProgress,
   getCustomerCourseAnalytics
 } from './analytics/video-analytics.controller';
-import { createProduct } from './adminpanel/product.controller';
+import { createProduct, reorderProducts } from './adminpanel/product.controller';
 import { 
   getBlogs, 
   getBlogById 
@@ -117,7 +117,11 @@ import {
   uploadSuccessStoryFiles,
   uploadEventImage,
   uploadMarketplaceImages,
+  uploadCourseDownloadFile,
+  uploadSettingsVideo,
 } from './middleware/upload.middleware';
+import { createCourseDownload, listCourseDownloads, deleteCourseDownload } from './adminpanel/courseDownload.controller';
+import { getSiteSettings, setSiteSetting, uploadSiteVideo } from './adminpanel/siteSettings.controller';
 import { createAuthor, deleteAuthor, getAuthorById, getAuthors, updateAuthor } from './adminpanel/author.controller';
 import { createCreator, deleteCreator, getCreatorById, getCreators, updateCreator } from './adminpanel/creator.controller';
 import { createSuccessStory, deleteSuccessStory, getSuccessStoryById, listSuccessStory } from './adminpanel/success.controller';
@@ -127,13 +131,18 @@ import { createEvent, updateEvent, deleteEvent, listEventsAdmin } from './adminp
 import { listBanners, createBanner as createBannerAdmin, updateBanner as updateBannerAdmin, deleteBanner as deleteBannerAdmin } from './adminpanel/banner.controller';
 import { getReferralSettings, updateReferralSettings, getMyReferralData, updateUpiId, requestPayout, getPayoutRequests, updatePayoutRequest } from './referral/referral.controller';
 import { createMarketplaceProduct, listMarketplaceProducts, getMarketplaceProduct, updateMarketplaceProduct, deleteMarketplaceProduct } from './adminpanel/marketplace.controller';
+import { createMarketplaceOrder, listMarketplaceOrders, updateMarketplaceOrderStatus } from './adminpanel/marketplaceOrder.controller';
+import { createCourseRazorpayOrder, verifyCoursePayment, createMarketplaceRazorpayOrder, verifyMarketplacePayment, razorpayWebhook } from './razorpay/razorpay.controller';
 
 dotenv.config();
 const app = express();
 const PORT: number = parseInt(process.env.PORT || '4000');
 
 // Middleware
-app.use(express.json());
+// Capture raw body for Razorpay webhook signature verification
+app.use(express.json({
+  verify: (req: any, res, buf) => { req.rawBody = buf; }
+}));
 app.use(express.urlencoded({ extended: true }));
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -436,6 +445,13 @@ app.get('/course-all-faqs/:id', (req: Request, res: Response, next: NextFunction
   getCourseFAQByCourseId(req, res, next);
 });
 
+app.delete('/adminpanel/course-faqs/:id',
+  authMiddleware,
+  (req: Request, res: Response, next: NextFunction) => {
+    deleteCourseFAQ(req as AuthRequest, res, next);
+  }
+);
+
 // General FAQ Routes
 app.post('/adminpanel/general-faqs', 
   authMiddleware,
@@ -544,14 +560,21 @@ app.post('/adminpanel/reviews', authMiddleware, (req: Request, res: Response, ne
   createReview(req as AuthRequest, res, next);
 });
 
+app.post('/adminpanel/courses/:courseId/reviews', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  adminCreateReview(req as AuthRequest, res, next);
+});
+
+app.delete('/adminpanel/reviews/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  deleteReview(req as AuthRequest, res, next);
+});
+
 app.get('/course/product/:productId', (req: Request, res: Response, next: NextFunction) => {
   getProductDetails(req, res, next);
 });
 
-app.put('/adminpanel/courses/:courseId', 
+app.put('/adminpanel/courses/:courseId',
   authMiddleware,
-  uploadCourseImage,
-  // File upload middleware
+  uploadCourseFiles,
   (req: Request, res: Response, next: NextFunction) => {
     updateCourse(req, res, next);
   }
@@ -561,6 +584,14 @@ app.delete('/adminpanel/courses/:courseId',
   authMiddleware, 
   (req: Request, res: Response, next: NextFunction) => {
     deleteCourse(req as AuthRequest, res, next);
+  }
+);
+
+// Reorder lessons within a course
+app.patch('/adminpanel/products/reorder',
+  authMiddleware,
+  (req: Request, res: Response, next: NextFunction) => {
+    reorderProducts(req as AuthRequest, res, next);
   }
 );
 
@@ -1199,4 +1230,59 @@ app.put('/adminpanel/marketplace-products/:id', authMiddleware, uploadMarketplac
 });
 app.delete('/adminpanel/marketplace-products/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
   deleteMarketplaceProduct(req as AuthRequest, res, next);
+});
+
+// Razorpay webhook (no auth — called by Razorpay servers)
+app.post('/razorpay/webhook', (req: Request, res: Response) => {
+  razorpayWebhook(req, res);
+});
+
+// Razorpay
+app.post('/razorpay/course-order', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  createCourseRazorpayOrder(req, res, next);
+});
+app.post('/razorpay/verify-course', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  verifyCoursePayment(req, res, next);
+});
+app.post('/razorpay/marketplace-order', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  createMarketplaceRazorpayOrder(req, res, next);
+});
+app.post('/razorpay/verify-marketplace', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  verifyMarketplacePayment(req, res, next);
+});
+
+// Marketplace Orders
+app.post('/marketplace-orders', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  createMarketplaceOrder(req, res, next);
+});
+app.get('/adminpanel/marketplace-orders', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  listMarketplaceOrders(req, res, next);
+});
+app.patch('/adminpanel/marketplace-orders/:id/status', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  updateMarketplaceOrderStatus(req, res, next);
+});
+
+// Course Downloads
+app.get('/courses/:courseId/downloads', (req: Request, res: Response) => {
+  listCourseDownloads(req, res);
+});
+app.get('/adminpanel/courses/:courseId/downloads', authMiddleware, (req: Request, res: Response) => {
+  listCourseDownloads(req, res);
+});
+app.post('/adminpanel/courses/:courseId/downloads', authMiddleware, uploadCourseDownloadFile, (req: Request, res: Response) => {
+  createCourseDownload(req as AuthRequest, res);
+});
+app.delete('/adminpanel/course-downloads/:downloadId', authMiddleware, (req: Request, res: Response) => {
+  deleteCourseDownload(req as AuthRequest, res);
+});
+
+// Site Settings
+app.get('/site-settings', (req: Request, res: Response) => {
+  getSiteSettings(req, res);
+});
+app.post('/adminpanel/site-settings', authMiddleware, (req: Request, res: Response) => {
+  setSiteSetting(req as AuthRequest, res);
+});
+app.post('/adminpanel/site-settings/video', authMiddleware, uploadSettingsVideo, (req: Request, res: Response) => {
+  uploadSiteVideo(req as AuthRequest, res);
 });

@@ -11,6 +11,51 @@ const createReviewSchema = z.object({
   ratting: z.number().int('Rating must be an integer').min(1, 'Rating must be at least 1').max(5, 'Rating must be at most 5'),
 });
 
+export const adminCreateReview = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (req.user?.role !== 'ADMIN') {
+      return res.status(403).json({ status: 0, message: 'Unauthorized' });
+    }
+    const { courseId } = req.params;
+    const { reviewerName, details, ratting } = req.body;
+    if (!details || !ratting) {
+      return res.status(400).json({ status: 0, message: 'details and ratting are required' });
+    }
+    const review = await prisma.review.create({
+      data: {
+        courseId,
+        reviewerName: reviewerName || 'Anonymous',
+        details,
+        ratting: Number(ratting),
+      },
+    });
+    return res.status(201).json({ status: 1, message: 'Review created', data: review });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteReview = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (req.user?.role !== 'ADMIN') {
+      return res.status(403).json({ status: 0, message: 'Unauthorized' });
+    }
+    const { id } = req.params;
+    await prisma.review.delete({ where: { id } });
+    return res.json({ status: 1, message: 'Review deleted' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Create review (Admin Only)
 export const createReview = async (
   req: AuthRequest,

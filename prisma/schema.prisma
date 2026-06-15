@@ -78,6 +78,14 @@ enum PaymentType {
   ONLINE
 }
 
+enum MarketplaceOrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
 model User {
   id            String       @id @unique @default(uuid())
   email         String       @unique
@@ -159,9 +167,10 @@ model Customer {
   upiId            String?
   payoutRequests   PayoutRequest[]
 
-  discountCoupon      DiscountCoupon[]
-  EventRegistration   EventRegistration[]
-  status              ActiveStatus @default(ACTIVE)
+  discountCoupon        DiscountCoupon[]
+  EventRegistration     EventRegistration[]
+  marketplaceOrders     MarketplaceOrder[]
+  status                ActiveStatus @default(ACTIVE)
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 }
@@ -260,6 +269,7 @@ model Course {
   cart Cart[]
   videoAnalytics VideoAnalytics[]
   courseFAQ CourseFAQ[]
+  downloads CourseDownload[]
 }
 
 model CourseFAQ {
@@ -284,6 +294,7 @@ model Product {
   videoStatus String       @default("idle")
   textContent String?
   status      ActiveStatus @default(ACTIVE)
+  order       Int          @default(0)
   createdBy   String
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -292,16 +303,17 @@ model Product {
 
 
 model Review {
-  id       String     @id @unique @default(uuid())
-  details String
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  courseId String 
-  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  customerId String
-  ratting Int
-  status ActiveStatus @default(ACTIVE)
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  id           String       @id @unique @default(uuid())
+  details      String
+  course       Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId     String
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId   String?
+  reviewerName String?
+  ratting      Int
+  status       ActiveStatus @default(ACTIVE)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 }
 
 model DiscountCoupon {
@@ -478,9 +490,28 @@ model FeatureGallery {
   id String @id @unique @default(uuid())
   imageLink String
   description String
+  linkUrl   String?
   status ActiveStatus @default(ACTIVE)
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
+}
+
+model CourseDownload {
+  id        String   @id @unique @default(uuid())
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId  String
+  fileName  String
+  fileUrl   String
+  fileSize  String?
+  createdAt DateTime @default(now())
+}
+
+model SiteSettings {
+  id        String   @id @unique @default(uuid())
+  key       String   @unique
+  value     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
  model FeatureOn {
@@ -577,20 +608,41 @@ model EventRegistration {
 }
 
 model MarketplaceProduct {
-  id             String       @id @unique @default(uuid())
+  id             String             @id @unique @default(uuid())
   name           String
   description    String
   price          String
-  originalPrice  String       @default("")
-  discount       String       @default("0")
+  originalPrice  String             @default("")
+  discount       String             @default("0")
   category       String
   images         String[]
-  highlights     Json         @default("[]")
+  highlights     Json               @default("[]")
   specifications String?
   importantNote  String?
   deliveryInfo   String?
-  status         ActiveStatus @default(ACTIVE)
+  status         ActiveStatus       @default(ACTIVE)
   createdBy      String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  orders         MarketplaceOrder[]
+}
+
+model MarketplaceOrder {
+  id            String                 @id @unique @default(uuid())
+  customer      Customer               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId    String
+  product       MarketplaceProduct     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId     String
+  quantity      Int                    @default(1)
+  totalAmount   String
+  status        MarketplaceOrderStatus @default(PENDING)
+  recipientName String?
+  phone         String?
+  addressLine   String
+  city          String?
+  state         String?
+  pinCode       String
+  country       String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
 }
