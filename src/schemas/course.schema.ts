@@ -64,6 +64,7 @@ export const createCourseRequestSchema = z.object({
   longDescription: z.string().min(3, 'Long description must be at least 3 characters'),
   whatsAppLink: z.string().optional().default('whatsapp://send?phone='),
   price: z.string().regex(/^\d+(\.\d+)?$/, 'Price must be a valid number'),
+  discountedPrice: z.string().regex(/^\d+(\.\d+)?$/, 'Discounted price must be a valid number').optional(),
   creatorId: z.string({ required_error: 'Creator ID is required' }),
   status: z.nativeEnum(ActiveStatus).default(ActiveStatus.ACTIVE).optional(),
   featured: z.union([
