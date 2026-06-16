@@ -53,3 +53,54 @@ export const uploadSiteVideo = async (req: AuthRequest, res: Response): Promise<
     res.status(500).json({ status: 0, message: 'Failed to upload video' });
   }
 };
+
+export const uploadSiteImage = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { key, append } = req.body;
+    const file = req.file;
+    if (!key || !file) {
+      res.status(400).json({ status: 0, message: 'Key and image file are required' });
+      return;
+    }
+    const fileUrl = await uploadToSpaces(file, 'images/settings');
+    let newValue = fileUrl;
+    if (append === 'true') {
+      const existing = await (prisma as any).siteSettings.findUnique({ where: { key } });
+      let arr: string[] = [];
+      try { arr = existing?.value ? JSON.parse(existing.value) : []; } catch { arr = []; }
+      if (!Array.isArray(arr)) arr = [];
+      arr.push(fileUrl);
+      newValue = JSON.stringify(arr);
+    }
+    const setting = await (prisma as any).siteSettings.upsert({
+      where: { key },
+      update: { value: newValue },
+      create: { key, value: newValue },
+    });
+    res.status(200).json({ status: 1, data: setting, url: fileUrl });
+  } catch (error) {
+    res.status(500).json({ status: 0, message: 'Failed to upload image' });
+  }
+};
+
+export const removeSiteImageItem = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { key, url } = req.body;
+    if (!key || !url) {
+      res.status(400).json({ status: 0, message: 'Key and url are required' });
+      return;
+    }
+    const existing = await (prisma as any).siteSettings.findUnique({ where: { key } });
+    let arr: string[] = [];
+    try { arr = existing?.value ? JSON.parse(existing.value) : []; } catch { arr = []; }
+    arr = arr.filter((u: string) => u !== url);
+    const setting = await (prisma as any).siteSettings.upsert({
+      where: { key },
+      update: { value: JSON.stringify(arr) },
+      create: { key, value: JSON.stringify(arr) },
+    });
+    res.status(200).json({ status: 1, data: setting });
+  } catch (error) {
+    res.status(500).json({ status: 0, message: 'Failed to remove image' });
+  }
+};

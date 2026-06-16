@@ -193,7 +193,7 @@ export const getCourseFAQByCourseId = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { courseId } = req.params;
+    const courseId = req.params.courseId || req.params.id;
 
     const faq = await prisma.courseFAQ.findMany({
       where: { courseId },

@@ -10,7 +10,7 @@ export const createEvent = async (req: AuthRequest, res: Response, next: NextFun
       return;
     }
 
-    const { title, shortDescription, description, date, time, venue, price, category, featured } = req.body;
+    const { title, shortDescription, description, date, time, venue, price, category, featured, mode } = req.body;
     const missing = ['title', 'shortDescription', 'description', 'date', 'time', 'venue', 'price'].filter(f => !req.body[f]);
     if (missing.length > 0) {
       res.status(400).json({ status: 0, message: `Missing fields: ${missing.join(', ')}` });
@@ -32,6 +32,7 @@ export const createEvent = async (req: AuthRequest, res: Response, next: NextFun
         venue,
         price,
         category: category || 'General',
+        mode: mode || 'Online',
         featured: featured === 'true' || featured === true,
         imageLink,
         createdBy: req.user.id,
@@ -53,7 +54,7 @@ export const updateEvent = async (req: AuthRequest, res: Response, next: NextFun
     }
 
     const { eventId } = req.params;
-    const { title, shortDescription, description, date, time, venue, price, category, featured, status } = req.body;
+    const { title, shortDescription, description, date, time, venue, price, category, featured, status, mode } = req.body;
 
     const updateData: any = {};
     if (title) updateData.title = title;
@@ -64,6 +65,7 @@ export const updateEvent = async (req: AuthRequest, res: Response, next: NextFun
     if (venue) updateData.venue = venue;
     if (price) updateData.price = price;
     if (category) updateData.category = category;
+    if (mode) updateData.mode = mode;
     if (featured !== undefined) updateData.featured = featured === 'true' || featured === true;
     if (status) updateData.status = status;
 

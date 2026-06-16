@@ -385,6 +385,18 @@ const settingsVideoUpload = multer({
 });
 export const uploadSettingsVideo = settingsVideoUpload.single('video');
 
+// Settings image upload (for site-wide image settings)
+export const uploadSettingsImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+}).single('image');
+
+// Product thumbnail upload
+export const uploadProductThumbnail = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).single('thumbnail');
+
 // Helper functions
 export const getImageUrl = (filename: string, type: 'category' | 'course' | 'blog' = 'category'): string => {
   const config = type === 'category' ? uploadPaths.category : type === 'course' ? uploadPaths.course : uploadPaths.blog; 

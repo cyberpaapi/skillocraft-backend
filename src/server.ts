@@ -68,7 +68,7 @@ import {
   getCustomerCourseProgress,
   getCustomerCourseAnalytics
 } from './analytics/video-analytics.controller';
-import { createProduct, reorderProducts } from './adminpanel/product.controller';
+import { createProduct, reorderProducts, updateProductThumbnail } from './adminpanel/product.controller';
 import { 
   getBlogs, 
   getBlogById 
@@ -119,9 +119,11 @@ import {
   uploadMarketplaceImages,
   uploadCourseDownloadFile,
   uploadSettingsVideo,
+  uploadSettingsImage,
+  uploadProductThumbnail,
 } from './middleware/upload.middleware';
 import { createCourseDownload, listCourseDownloads, deleteCourseDownload } from './adminpanel/courseDownload.controller';
-import { getSiteSettings, setSiteSetting, uploadSiteVideo } from './adminpanel/siteSettings.controller';
+import { getSiteSettings, setSiteSetting, uploadSiteVideo, uploadSiteImage, removeSiteImageItem } from './adminpanel/siteSettings.controller';
 import { createAuthor, deleteAuthor, getAuthorById, getAuthors, updateAuthor } from './adminpanel/author.controller';
 import { createCreator, deleteCreator, getCreatorById, getCreators, updateCreator } from './adminpanel/creator.controller';
 import { createSuccessStory, deleteSuccessStory, getSuccessStoryById, listSuccessStory } from './adminpanel/success.controller';
@@ -614,10 +616,14 @@ app.post('/adminpanel/products/:productId/upload-video',
   }
 );
 
-app.delete('/products/:productId/video', 
-  authMiddleware, 
+app.delete('/products/:productId/video',
+  authMiddleware,
   (req: Request, res: Response, next: NextFunction) => {
   deleteProductVideo(req, res, next);
+});
+
+app.post('/adminpanel/products/:productId/thumbnail', authMiddleware, uploadProductThumbnail, (req: Request, res: Response) => {
+  updateProductThumbnail(req as AuthRequest, res);
 });
 
 //blogs Routes (Public)
@@ -1285,4 +1291,10 @@ app.post('/adminpanel/site-settings', authMiddleware, (req: Request, res: Respon
 });
 app.post('/adminpanel/site-settings/video', authMiddleware, uploadSettingsVideo, (req: Request, res: Response) => {
   uploadSiteVideo(req as AuthRequest, res);
+});
+app.post('/adminpanel/site-settings/image', authMiddleware, uploadSettingsImage, (req: Request, res: Response) => {
+  uploadSiteImage(req as AuthRequest, res);
+});
+app.delete('/adminpanel/site-settings/image-item', authMiddleware, (req: Request, res: Response) => {
+  removeSiteImageItem(req as AuthRequest, res);
 });

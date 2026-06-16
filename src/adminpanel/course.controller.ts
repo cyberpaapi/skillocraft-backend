@@ -183,6 +183,7 @@ export const createCourse = async (
           language: validatedData.language,
           whatsAppLink: validatedData.whatsAppLink,
           pdfLink: pdfLink,
+          discountedPrice: validatedData.discountedPrice ? parseFloat(validatedData.discountedPrice).toString() : null,
           status: ActiveStatus.ACTIVE,
           featured: featured,
           createdBy: req.user.email, // Using email for consistency with category creation
@@ -353,6 +354,9 @@ export const updateCourse = async (
     // Only update price if provided
     if (req.body.price) {
       updateData.price = parseFloat(req.body.price).toString();
+    }
+    if (req.body.discountedPrice !== undefined) {
+      updateData.discountedPrice = req.body.discountedPrice ? parseFloat(req.body.discountedPrice).toString() : null;
     }
 
     // Update course data

@@ -440,3 +440,16 @@ export const deleteProduct = async (
     next(error);
   }
 };
+
+export const updateProductThumbnail = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { productId } = req.params;
+  const file = req.file;
+  if (!file) { res.status(400).json({ status: 0, message: 'Thumbnail image required' }); return; }
+  try {
+    const thumbnailUrl = await uploadToSpaces(file, 'images/thumbnails');
+    await prisma.product.update({ where: { id: productId }, data: { thumbnail: thumbnailUrl } });
+    res.status(200).json({ status: 1, message: 'Thumbnail updated', url: thumbnailUrl });
+  } catch (error) {
+    res.status(500).json({ status: 0, message: 'Failed to update thumbnail' });
+  }
+};

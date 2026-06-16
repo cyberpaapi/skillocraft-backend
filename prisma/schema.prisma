@@ -253,9 +253,10 @@ model Course {
   creator Creators @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   creatorId String
   featured Boolean @default(false)
-  language String
+  language String       @default("Hindi")
   status ActiveStatus @default(ACTIVE)
   price String
+  discountedPrice String?
   whatsAppLink String
   pdfLink String?
   createdBy String
@@ -293,6 +294,7 @@ model Product {
   videoLink   String?
   videoStatus String       @default("idle")
   textContent String?
+  thumbnail   String?
   status      ActiveStatus @default(ACTIVE)
   order       Int          @default(0)
   createdBy   String
@@ -586,6 +588,7 @@ model Event {
   venue            String
   price            String
   category         String
+  mode             String       @default("Online")
   status           ActiveStatus @default(ACTIVE)
   featured         Boolean      @default(false)
   createdBy        String
