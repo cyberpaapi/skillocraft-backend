@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../db/db.config';
 import { AuthRequest } from '../types';
-import { uploadFile } from '../utils/uploadFile';
+import { uploadToSpaces } from '../utils/uploadToSpaces';
 
 export const createEvent = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -19,7 +19,12 @@ export const createEvent = async (req: AuthRequest, res: Response, next: NextFun
 
     let imageLink: string | undefined;
     if (req.file) {
-      imageLink = await uploadFile(req.file, 'skillocraft/images/events', 'images/events', 'image');
+      try {
+        imageLink = await uploadToSpaces(req.file, 'images/events');
+      } catch (uploadErr) {
+        console.error('Event image upload failed, creating event without image:', uploadErr);
+        imageLink = undefined;
+      }
     }
 
     const event = await prisma.event.create({
@@ -30,12 +35,12 @@ export const createEvent = async (req: AuthRequest, res: Response, next: NextFun
         date,
         time,
         venue,
-        price,
+        price: String(price),
         category: category || 'General',
         mode: mode || 'Online',
         featured: featured === 'true' || featured === true,
         imageLink,
-        createdBy: req.user.id,
+        createdBy: req.user?.id || req.user?.email || 'admin',
         status: 'ACTIVE',
       },
     });
@@ -70,7 +75,11 @@ export const updateEvent = async (req: AuthRequest, res: Response, next: NextFun
     if (status) updateData.status = status;
 
     if (req.file) {
-      updateData.imageLink = await uploadFile(req.file, 'skillocraft/images/events', 'images/events', 'image');
+      try {
+        updateData.imageLink = await uploadToSpaces(req.file, 'images/events');
+      } catch (uploadErr) {
+        console.error('Event image upload failed, keeping existing image:', uploadErr);
+      }
     }
 
     const event = await prisma.event.update({ where: { id: eventId }, data: updateData });

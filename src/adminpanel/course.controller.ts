@@ -184,6 +184,10 @@ export const createCourse = async (
           whatsAppLink: validatedData.whatsAppLink,
           pdfLink: pdfLink,
           discountedPrice: validatedData.discountedPrice ? parseFloat(validatedData.discountedPrice).toString() : null,
+          lectures: validatedData.lectures || null,
+          duration: validatedData.duration || null,
+          recommended: Boolean(validatedData.recommended),
+          certificate: req.body.certificate ? String(req.body.certificate) : null,
           status: ActiveStatus.ACTIVE,
           featured: featured,
           createdBy: req.user.email, // Using email for consistency with category creation
@@ -357,6 +361,18 @@ export const updateCourse = async (
     }
     if (req.body.discountedPrice !== undefined) {
       updateData.discountedPrice = req.body.discountedPrice ? parseFloat(req.body.discountedPrice).toString() : null;
+    }
+    if (req.body.lectures !== undefined) {
+      updateData.lectures = req.body.lectures ? String(req.body.lectures) : null;
+    }
+    if (req.body.duration !== undefined) {
+      updateData.duration = req.body.duration ? String(req.body.duration) : null;
+    }
+    if (req.body.recommended !== undefined) {
+      updateData.recommended = req.body.recommended === 'true' || req.body.recommended === true;
+    }
+    if (req.body.certificate !== undefined) {
+      updateData.certificate = req.body.certificate ? String(req.body.certificate) : null;
     }
 
     // Update course data

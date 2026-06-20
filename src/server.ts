@@ -32,6 +32,8 @@ import {
   getCourseCustomers
 } from './course/course.controller';
 import { createReview, adminCreateReview, deleteReview } from './course/review.controller';
+import { createCallbackRequest, listCallbackRequests, updateCallbackRequest, deleteCallbackRequest } from './course/callback.controller';
+import { createDoubtRequest, listDoubtRequests, updateDoubtRequest, deleteDoubtRequest } from './course/doubt.controller';
 import { createCourseFAQ, listCourseFAQs, getCourseFAQById, getCourseFAQByCourseId, deleteCourseFAQ } from './adminpanel/courseFaq.controller';
 import { 
   createGeneralFAQ, 
@@ -133,8 +135,10 @@ import { createEvent, updateEvent, deleteEvent, listEventsAdmin } from './adminp
 import { listBanners, createBanner as createBannerAdmin, updateBanner as updateBannerAdmin, deleteBanner as deleteBannerAdmin } from './adminpanel/banner.controller';
 import { getReferralSettings, updateReferralSettings, getMyReferralData, updateUpiId, requestPayout, getPayoutRequests, updatePayoutRequest } from './referral/referral.controller';
 import { createMarketplaceProduct, listMarketplaceProducts, getMarketplaceProduct, updateMarketplaceProduct, deleteMarketplaceProduct } from './adminpanel/marketplace.controller';
+import { listMarketplaceCategories, createMarketplaceCategory, deleteMarketplaceCategory } from './adminpanel/marketplaceCategory.controller';
 import { createMarketplaceOrder, listMarketplaceOrders, updateMarketplaceOrderStatus } from './adminpanel/marketplaceOrder.controller';
 import { createCourseRazorpayOrder, verifyCoursePayment, createMarketplaceRazorpayOrder, verifyMarketplacePayment, razorpayWebhook } from './razorpay/razorpay.controller';
+import { validateDiscountCode } from './order/checkout.controller';
 
 dotenv.config();
 const app = express();
@@ -425,6 +429,40 @@ app.get('/courses/:courseId', (req: Request, res: Response, next: NextFunction) 
 
 app.get('/courses/:courseId/customers', (req: Request, res: Response, next: NextFunction) => {
   getCourseCustomers(req, res, next);
+});
+
+// Callback Request Routes
+app.post('/callback-requests', (req: Request, res: Response, next: NextFunction) => {
+  createCallbackRequest(req, res, next);
+});
+
+app.get('/adminpanel/callback-requests', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  listCallbackRequests(req as AuthRequest, res, next);
+});
+
+app.patch('/adminpanel/callback-requests/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  updateCallbackRequest(req as AuthRequest, res, next);
+});
+
+app.delete('/adminpanel/callback-requests/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  deleteCallbackRequest(req as AuthRequest, res, next);
+});
+
+// Doubt Clearing Request Routes
+app.post('/doubt-requests', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  createDoubtRequest(req as AuthRequest, res, next);
+});
+
+app.get('/adminpanel/doubt-requests', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  listDoubtRequests(req as AuthRequest, res, next);
+});
+
+app.patch('/adminpanel/doubt-requests/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  updateDoubtRequest(req as AuthRequest, res, next);
+});
+
+app.delete('/adminpanel/doubt-requests/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  deleteDoubtRequest(req as AuthRequest, res, next);
 });
 
 // Course FAQ Routes
@@ -1221,6 +1259,20 @@ app.patch('/adminpanel/payout-requests/:id', authMiddleware, (req: AuthRequest, 
   updatePayoutRequest(req, res, next);
 });
 
+// Marketplace Categories
+app.get('/marketplace-categories', (req: Request, res: Response, next: NextFunction) => {
+  listMarketplaceCategories(req, res, next);
+});
+app.get('/adminpanel/marketplace-categories', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  listMarketplaceCategories(req, res, next);
+});
+app.post('/adminpanel/marketplace-categories', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  createMarketplaceCategory(req as AuthRequest, res, next);
+});
+app.delete('/adminpanel/marketplace-categories/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  deleteMarketplaceCategory(req as AuthRequest, res, next);
+});
+
 // Marketplace Routes
 app.get('/marketplace-products', (req: Request, res: Response, next: NextFunction) => {
   listMarketplaceProducts(req, res, next);
@@ -1241,6 +1293,11 @@ app.delete('/adminpanel/marketplace-products/:id', authMiddleware, (req: Request
 // Razorpay webhook (no auth — called by Razorpay servers)
 app.post('/razorpay/webhook', (req: Request, res: Response) => {
   razorpayWebhook(req, res);
+});
+
+// Validate a coupon / referral code against the cart
+app.post('/checkout/validate-code', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  validateDiscountCode(req, res, next);
 });
 
 // Razorpay

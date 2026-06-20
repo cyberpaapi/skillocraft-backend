@@ -4,12 +4,13 @@ import path from 'path';
 import { ZodError } from 'zod';
 import { Prisma } from '@prisma/client';
 import prisma from '../db/db.config';
-import { 
-  categorySchema,  
+import {
+  categorySchema,
   categoryResponseSchema,
   categoriesListResponseSchema,
-  apiErrorResponseSchema 
+  apiErrorResponseSchema
 } from '../schemas/admin.schema';
+import { ensureMarketplaceCategory } from './marketplaceCategory.controller';
 import { AuthRequest, ActiveStatus } from '../types';
 import { uploadFile } from '../utils/uploadFile';
 
@@ -226,9 +227,25 @@ export const createCategory = async (
       }
     }
 
-    const featured = typeof validationData.featured === 'string' 
+    const featured = typeof validationData.featured === 'string'
   ? validationData.featured === 'true' || validationData.featured === '1'
   : Boolean(validationData.featured);
+
+    // Unify same-name categories: if one already exists (case-insensitive), reuse it
+    const duplicate = await prisma.category.findFirst({
+      where: { name: { equals: validationData.name, mode: 'insensitive' } },
+      include: { children: true },
+    });
+    if (duplicate) {
+      // Make sure it's reflected in the marketplace too
+      try { await ensureMarketplaceCategory(duplicate.name, duplicate.imageUrl || null); } catch {}
+      res.status(200).json({
+        status: 1,
+        message: 'Category already exists',
+        data: { ...duplicate, subCategory: (duplicate as any).children || [] },
+      });
+      return;
+    }
 
     // Create the category with the processed file URLs
     const category = await prisma.category.create({
@@ -267,6 +284,9 @@ export const createCategory = async (
         }
       }
     });
+
+    // Replicate the new course category into the marketplace category list
+    try { await ensureMarketplaceCategory(category.name, category.imageUrl || null); } catch {}
 
     // Transform the response to match the desired format
     const responseData = {

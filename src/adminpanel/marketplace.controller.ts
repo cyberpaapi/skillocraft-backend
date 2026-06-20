@@ -4,6 +4,7 @@ import prisma from '../db/db.config';
 import { AuthRequest } from '../types';
 import { uploadToSpaces } from '../utils/uploadToSpaces';
 import { deleteFromSpaces } from '../utils/deleteFromSpaces';
+import { ensureMarketplaceCategory } from './marketplaceCategory.controller';
 
 export const createMarketplaceProduct = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -22,6 +23,11 @@ export const createMarketplaceProduct = async (req: AuthRequest, res: Response, 
     let highlights: object[] = [];
     try { highlights = JSON.parse(req.body.highlights || '[]'); } catch {}
 
+    // Make sure the chosen category is registered as a marketplace category
+    if (req.body.category) {
+      try { await ensureMarketplaceCategory(req.body.category); } catch {}
+    }
+
     const product = await prisma.marketplaceProduct.create({
       data: {
         name: req.body.name,
@@ -35,6 +41,8 @@ export const createMarketplaceProduct = async (req: AuthRequest, res: Response, 
         specifications: req.body.specifications || null,
         importantNote: req.body.importantNote || null,
         deliveryInfo: req.body.deliveryInfo || null,
+        featured: req.body.featured === 'true' || req.body.featured === true,
+        bestSelling: req.body.bestSelling === 'true' || req.body.bestSelling === true,
         status: ActiveStatus.ACTIVE,
         createdBy: req.user?.id || 'admin',
       },
@@ -109,6 +117,10 @@ export const updateMarketplaceProduct = async (req: AuthRequest, res: Response, 
       try { highlights = JSON.parse(req.body.highlights); } catch {}
     }
 
+    if (req.body.category && req.body.category !== existing.category) {
+      try { await ensureMarketplaceCategory(req.body.category); } catch {}
+    }
+
     const updated = await prisma.marketplaceProduct.update({
       where: { id: req.params.id },
       data: {
@@ -122,6 +134,8 @@ export const updateMarketplaceProduct = async (req: AuthRequest, res: Response, 
         highlights,
         specifications: req.body.specifications ?? existing.specifications,
         importantNote: req.body.importantNote ?? existing.importantNote,
+        featured: req.body.featured !== undefined ? (req.body.featured === 'true' || req.body.featured === true) : existing.featured,
+        bestSelling: req.body.bestSelling !== undefined ? (req.body.bestSelling === 'true' || req.body.bestSelling === true) : existing.bestSelling,
         deliveryInfo: req.body.deliveryInfo ?? existing.deliveryInfo,
         status: (req.body.status as ActiveStatus) || existing.status,
       },

@@ -257,6 +257,10 @@ model Course {
   status ActiveStatus @default(ACTIVE)
   price String
   discountedPrice String?
+  lectures String?
+  duration String?
+  recommended Boolean @default(false)
+  certificate String?
   whatsAppLink String
   pdfLink String?
   createdBy String
@@ -623,11 +627,21 @@ model MarketplaceProduct {
   specifications String?
   importantNote  String?
   deliveryInfo   String?
+  featured       Boolean            @default(false)
+  bestSelling    Boolean            @default(false)
   status         ActiveStatus       @default(ACTIVE)
   createdBy      String
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   orders         MarketplaceOrder[]
+}
+
+model MarketplaceCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model MarketplaceOrder {
@@ -648,4 +662,29 @@ model MarketplaceOrder {
   country       String?
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
+}
+
+model CallbackRequest {
+  id        String       @id @unique @default(uuid())
+  name      String
+  phone     String
+  courseId  String?
+  courseName String?
+  message   String?
+  status    String       @default("PENDING")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model DoubtRequest {
+  id         String   @id @unique @default(uuid())
+  name       String
+  phone      String
+  customerId String?
+  courseId   String?
+  courseName String?
+  message    String?
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

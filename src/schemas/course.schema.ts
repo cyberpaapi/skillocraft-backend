@@ -65,6 +65,12 @@ export const createCourseRequestSchema = z.object({
   whatsAppLink: z.string().optional().default('whatsapp://send?phone='),
   price: z.string().regex(/^\d+(\.\d+)?$/, 'Price must be a valid number'),
   discountedPrice: z.string().regex(/^\d+(\.\d+)?$/, 'Discounted price must be a valid number').optional(),
+  lectures: z.string().optional(),
+  duration: z.string().optional(),
+  recommended: z.union([
+    z.boolean(),
+    z.string().transform(val => val === 'true' || val === '1')
+  ]).optional().default(false),
   creatorId: z.string({ required_error: 'Creator ID is required' }),
   status: z.nativeEnum(ActiveStatus).default(ActiveStatus.ACTIVE).optional(),
   featured: z.union([

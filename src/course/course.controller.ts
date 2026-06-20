@@ -180,7 +180,8 @@ export const getCourseDetails = async (
       createdBy, createdAt, updatedAt, product: products,
       category, categoryId, review: reviews,
       creator, creatorId, featured, language,
-      pdfLink, whatsAppLink
+      pdfLink, whatsAppLink, discountedPrice, lectures, duration,
+      recommended, certificate
     } = course;
 
     // Get similar courses (same category, exclude current course)
@@ -215,6 +216,38 @@ export const getCourseDetails = async (
         { createdAt: 'desc' } // Then sort by newest
       ]
     });
+
+    // Get admin-selected recommended courses (exclude current course)
+    const recommendedCoursesRaw = await prisma.course.findMany({
+      where: {
+        recommended: true,
+        id: { not: id },
+        status: 'ACTIVE'
+      },
+      take: 8,
+      select: {
+        id: true,
+        name: true,
+        image: true,
+        shortDescription: true,
+        price: true,
+        discountedPrice: true,
+        language: true,
+        creator: { select: { name: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const recommendedCourses = recommendedCoursesRaw.map(c => ({
+      id: c.id,
+      name: c.name,
+      image: c.image,
+      shortDescription: c.shortDescription,
+      price: c.price,
+      discountedPrice: c.discountedPrice,
+      language: c.language,
+      creatorName: c.creator?.name || 'Skillocraft'
+    }));
 
     // Calculate average rating for each similar course
     const similarCoursesWithRating = similarCourses.map(course => {
@@ -272,6 +305,11 @@ export const getCourseDetails = async (
         featured,
         language,
         price,
+        discountedPrice,
+        lectures,
+        duration,
+        recommended,
+        certificate,
         status,
         pdfLink,
         whatsAppLink,
@@ -306,7 +344,8 @@ export const getCourseDetails = async (
             updatedAt: review.updatedAt
           })) || []
         },
-        similarCourses: similarCoursesWithRating
+        similarCourses: similarCoursesWithRating,
+        recommendedCourses
       }
     });
   } catch (error) {

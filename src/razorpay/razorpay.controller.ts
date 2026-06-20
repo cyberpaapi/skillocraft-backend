@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../types';
 import prisma from '../db/db.config';
+import { computeCartTotalWithCode } from '../order/checkout.controller';
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
@@ -19,16 +20,26 @@ export const createCourseRazorpayOrder = async (
   try {
     if (!req.user?.email) return res.status(401).json({ status: 0, message: 'Authentication required' });
 
-    const { cartIds, totalAmount } = req.body;
-    if (!cartIds?.length || !totalAmount) {
-      return res.status(400).json({ status: 0, message: 'cartIds and totalAmount are required' });
+    const { cartIds, code } = req.body;
+    if (!cartIds?.length) {
+      return res.status(400).json({ status: 0, message: 'cartIds are required' });
     }
 
     const user = await prisma.user.findUnique({ where: { email: req.user.email }, select: { id: true } });
     const customer = user ? await prisma.customer.findFirst({ where: { userId: user.id }, select: { id: true } }) : null;
-    if (!customer) return res.status(403).json({ status: 0, message: 'Customer not found' });
+    if (!user || !customer) return res.status(403).json({ status: 0, message: 'Customer not found' });
 
-    const amountPaise = Math.round(parseFloat(totalAmount) * 100);
+    // Compute the authoritative amount server-side (applies coupon/referral code if valid)
+    const pricing = await computeCartTotalWithCode({ userId: user.id, customerId: customer.id, cartIds, code });
+    if (pricing.error) {
+      return res.status(400).json({ status: 0, message: pricing.error });
+    }
+    if (pricing.finalTotal <= 0) {
+      return res.status(400).json({ status: 0, message: 'Cart total is invalid' });
+    }
+
+    const finalAmount = pricing.finalTotal;
+    const amountPaise = Math.round(finalAmount * 100);
 
     const order = await razorpay.orders.create({
       amount: amountPaise,
@@ -37,9 +48,11 @@ export const createCourseRazorpayOrder = async (
       notes: {
         type: 'course',
         customerId: customer.id,
-        userId: user!.id,
+        userId: user.id,
         cartIds: cartIds.join(','),
-        totalAmount: String(totalAmount),
+        totalAmount: finalAmount.toFixed(2),
+        discount: pricing.discount.toFixed(2),
+        code: pricing.applied?.code || '',
       } as any,
     });
 
@@ -50,6 +63,9 @@ export const createCourseRazorpayOrder = async (
         amount: order.amount,
         currency: order.currency,
         keyId: process.env.RAZORPAY_KEY_ID,
+        totalAmount: finalAmount.toFixed(2),
+        discount: pricing.discount.toFixed(2),
+        applied: pricing.applied,
       },
     });
   } catch (error) {
