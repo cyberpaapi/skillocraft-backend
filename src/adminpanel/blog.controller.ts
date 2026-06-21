@@ -194,11 +194,11 @@ export const updateBlog = async (
     }
 
     const { data } = validationResult;
-    
-    // Prepare update data
+
+    // Prepare update data (Blog has no `updatedBy` column — do not include it)
+    void userId;
     const updateData: any = {
       ...data,
-      updatedBy: userId,
     };
 
     // If a new image was uploaded, update the image field
