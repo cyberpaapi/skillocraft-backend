@@ -241,6 +241,282 @@ export const verifyMarketplacePayment = async (
   }
 };
 
+// ─── Live event checkout ──────────────────────────────────────────────────────
+
+export const createEventRazorpayOrder = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user) return res.status(401).json({ status: 0, message: 'Authentication required' });
+    const { eventId } = req.body;
+    if (!eventId) return res.status(400).json({ status: 0, message: 'eventId is required' });
+
+    const customer = await prisma.customer.findFirst({ where: { userId: req.user.id }, select: { id: true } });
+    if (!customer) return res.status(403).json({ status: 0, message: 'Customer not found' });
+
+    const event = await prisma.event.findUnique({ where: { id: eventId } });
+    if (!event) return res.status(404).json({ status: 0, message: 'Event not found' });
+
+    const already = await prisma.eventRegistration.findUnique({
+      where: { eventId_customerId: { eventId, customerId: customer.id } },
+    });
+    if (already) return res.status(400).json({ status: 0, message: 'Already registered for this event' });
+
+    const amount = parseFloat(event.price || '0');
+    if (!(amount > 0)) return res.status(400).json({ status: 0, message: 'This is a free event — no payment needed' });
+
+    const order = await razorpay.orders.create({
+      amount: Math.round(amount * 100),
+      currency: 'INR',
+      receipt: `event_${Date.now()}`,
+      notes: {
+        type: 'event',
+        customerId: customer.id,
+        userId: req.user.id,
+        eventId,
+        amount: amount.toFixed(2),
+      } as any,
+    });
+
+    return res.json({
+      status: 1,
+      data: {
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        keyId: process.env.RAZORPAY_KEY_ID,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyEventPayment = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user) return res.status(401).json({ status: 0, message: 'Authentication required' });
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, eventId } = req.body;
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature || !eventId) {
+      return res.status(400).json({ status: 0, message: 'Missing payment verification fields' });
+    }
+
+    const expectedSig = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
+      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+      .digest('hex');
+    if (expectedSig !== razorpaySignature) {
+      return res.status(400).json({ status: 0, message: 'Payment verification failed — invalid signature' });
+    }
+
+    const customer = await prisma.customer.findFirst({ where: { userId: req.user.id }, select: { id: true } });
+    if (!customer) return res.status(404).json({ status: 0, message: 'Customer not found' });
+
+    const existing = await prisma.eventRegistration.findUnique({
+      where: { eventId_customerId: { eventId, customerId: customer.id } },
+    });
+    if (existing) return res.json({ status: 1, message: 'Already registered', data: existing });
+
+    const event = await prisma.event.findUnique({ where: { id: eventId }, select: { price: true } });
+    const registration = await prisma.eventRegistration.create({
+      data: { eventId, customerId: customer.id, amount: event?.price || '0' },
+    });
+
+    return res.json({ status: 1, message: 'Payment verified and registered', data: registration });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─── Marketplace cart checkout (multi-item) ──────────────────────────────────
+
+export const createMarketplaceCartRazorpayOrder = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user) return res.status(401).json({ status: 0, message: 'Authentication required' });
+    const { recipientName, phone, addressLine, city, state, pinCode, country } = req.body;
+    if (!addressLine || !pinCode) return res.status(400).json({ status: 0, message: 'Address and pincode are required' });
+
+    const customer = await prisma.customer.findFirst({ where: { userId: req.user.id }, select: { id: true } });
+    if (!customer) return res.status(403).json({ status: 0, message: 'Customer not found' });
+
+    const items = await prisma.marketplaceCart.findMany({ where: { customerId: customer.id }, include: { product: true } });
+    if (items.length === 0) return res.status(400).json({ status: 0, message: 'Your cart is empty' });
+
+    const totalAmount = items.reduce((s, i) => s + parseFloat(i.product.price) * i.quantity, 0);
+    const cartIds = items.map((i) => i.id).join(',');
+
+    const order = await razorpay.orders.create({
+      amount: Math.round(totalAmount * 100),
+      currency: 'INR',
+      receipt: `mpcart_${Date.now()}`,
+      notes: {
+        type: 'marketplace_cart',
+        customerId: customer.id,
+        userId: req.user.id,
+        cartIds,
+        totalAmount: totalAmount.toFixed(2),
+        recipientName: recipientName || '',
+        phone: phone || '',
+        addressLine: (addressLine || '').substring(0, 200),
+        city: city || '',
+        state: state || '',
+        pinCode: pinCode || '',
+        country: country || '',
+      } as any,
+    });
+
+    return res.json({
+      status: 1,
+      data: { orderId: order.id, amount: order.amount, currency: order.currency, keyId: process.env.RAZORPAY_KEY_ID, totalAmount: totalAmount.toFixed(2) },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyMarketplaceCartPayment = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user || req.user.role !== 'CUSTOMER') return res.status(403).json({ status: 0, message: 'Customer login required' });
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, recipientName, phone, addressLine, city, state, pinCode, country } = req.body;
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature || !addressLine || !pinCode) {
+      return res.status(400).json({ status: 0, message: 'Missing required fields' });
+    }
+
+    const expectedSig = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!).update(`${razorpayOrderId}|${razorpayPaymentId}`).digest('hex');
+    if (expectedSig !== razorpaySignature) return res.status(400).json({ status: 0, message: 'Payment verification failed — invalid signature' });
+
+    const customer = await prisma.customer.findFirst({ where: { userId: req.user.id }, select: { id: true } });
+    if (!customer) return res.status(404).json({ status: 0, message: 'Customer not found' });
+
+    const items = await prisma.marketplaceCart.findMany({ where: { customerId: customer.id }, include: { product: true } });
+    if (items.length === 0) return res.json({ status: 1, message: 'Order already processed', data: [] });
+
+    const created = [];
+    for (const i of items) {
+      const order = await prisma.marketplaceOrder.create({
+        data: {
+          customerId: customer.id,
+          productId: i.productId,
+          quantity: i.quantity,
+          totalAmount: String((parseFloat(i.product.price) * i.quantity).toFixed(2)),
+          recipientName: recipientName || null,
+          phone: phone || null,
+          addressLine,
+          city: city || null,
+          state: state || null,
+          pinCode,
+          country: country || null,
+        },
+      });
+      created.push(order);
+    }
+    await prisma.marketplaceCart.deleteMany({ where: { customerId: customer.id } });
+
+    return res.json({ status: 1, message: 'Payment verified and orders placed', data: created });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─── Event cart checkout (multi-event) ────────────────────────────────────────
+
+export const createEventCartRazorpayOrder = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user) return res.status(401).json({ status: 0, message: 'Authentication required' });
+    const customer = await prisma.customer.findFirst({ where: { userId: req.user.id }, select: { id: true } });
+    if (!customer) return res.status(403).json({ status: 0, message: 'Customer not found' });
+
+    const items = await prisma.eventCart.findMany({ where: { customerId: customer.id }, include: { event: true } });
+    if (items.length === 0) return res.status(400).json({ status: 0, message: 'Your event cart is empty' });
+
+    const totalAmount = items.reduce((s, i) => s + parseFloat(i.event.price || '0'), 0);
+
+    // All-free cart → register directly, no payment needed
+    if (!(totalAmount > 0)) {
+      for (const i of items) {
+        await prisma.eventRegistration.upsert({
+          where: { eventId_customerId: { eventId: i.eventId, customerId: customer.id } },
+          update: {},
+          create: { eventId: i.eventId, customerId: customer.id, amount: i.event.price || '0' },
+        });
+      }
+      await prisma.eventCart.deleteMany({ where: { customerId: customer.id } });
+      return res.json({ status: 1, free: true, message: 'Registered for all events' });
+    }
+
+    const order = await razorpay.orders.create({
+      amount: Math.round(totalAmount * 100),
+      currency: 'INR',
+      receipt: `evcart_${Date.now()}`,
+      notes: {
+        type: 'event_cart',
+        customerId: customer.id,
+        userId: req.user.id,
+        eventIds: items.map((i) => i.eventId).join(','),
+        totalAmount: totalAmount.toFixed(2),
+      } as any,
+    });
+
+    return res.json({
+      status: 1,
+      data: { orderId: order.id, amount: order.amount, currency: order.currency, keyId: process.env.RAZORPAY_KEY_ID, totalAmount: totalAmount.toFixed(2) },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyEventCartPayment = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user || req.user.role !== 'CUSTOMER') return res.status(403).json({ status: 0, message: 'Customer login required' });
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) return res.status(400).json({ status: 0, message: 'Missing payment fields' });
+
+    const expectedSig = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!).update(`${razorpayOrderId}|${razorpayPaymentId}`).digest('hex');
+    if (expectedSig !== razorpaySignature) return res.status(400).json({ status: 0, message: 'Payment verification failed — invalid signature' });
+
+    const customer = await prisma.customer.findFirst({ where: { userId: req.user.id }, select: { id: true } });
+    if (!customer) return res.status(404).json({ status: 0, message: 'Customer not found' });
+
+    const items = await prisma.eventCart.findMany({ where: { customerId: customer.id }, include: { event: true } });
+    if (items.length === 0) return res.json({ status: 1, message: 'Already processed', data: [] });
+
+    for (const i of items) {
+      await prisma.eventRegistration.upsert({
+        where: { eventId_customerId: { eventId: i.eventId, customerId: customer.id } },
+        update: {},
+        create: { eventId: i.eventId, customerId: customer.id, amount: i.event.price || '0' },
+      });
+    }
+    await prisma.eventCart.deleteMany({ where: { customerId: customer.id } });
+
+    return res.json({ status: 1, message: 'Payment verified and registered', data: items.map((i) => i.eventId) });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ─── Webhook (server-to-server, fires even if browser closes) ─────────────────
 
 export const razorpayWebhook = async (req: Request, res: Response) => {
@@ -342,6 +618,61 @@ export const razorpayWebhook = async (req: Request, res: Response) => {
         });
 
         console.log('[Webhook] Marketplace order created via webhook for payment', paymentId);
+      } else if (notes.type === 'event') {
+        const { customerId, eventId, amount } = notes;
+        if (!customerId || !eventId) {
+          console.error('[Webhook] Missing event registration data in notes');
+          return res.json({ status: 'ok' });
+        }
+        const existing = await prisma.eventRegistration.findUnique({
+          where: { eventId_customerId: { eventId, customerId } },
+        });
+        if (existing) {
+          console.log('[Webhook] Event registration already exists, skipping');
+          return res.json({ status: 'ok' });
+        }
+        await prisma.eventRegistration.create({
+          data: { eventId, customerId, amount: String(amount || '0') },
+        });
+        console.log('[Webhook] Event registration created via webhook for payment', paymentId);
+
+      } else if (notes.type === 'marketplace_cart') {
+        const { customerId, cartIds: cartIdsStr, recipientName, phone, addressLine, city, state, pinCode, country } = notes;
+        const cartIds: string[] = (cartIdsStr || '').split(',').filter(Boolean);
+        if (!customerId || cartIds.length === 0 || !addressLine || !pinCode) return res.json({ status: 'ok' });
+
+        const items = await prisma.marketplaceCart.findMany({ where: { id: { in: cartIds }, customerId }, include: { product: true } });
+        if (items.length === 0) { console.log('[Webhook] Marketplace cart already processed'); return res.json({ status: 'ok' }); }
+
+        for (const i of items) {
+          await prisma.marketplaceOrder.create({
+            data: {
+              customerId, productId: i.productId, quantity: i.quantity,
+              totalAmount: String((parseFloat(i.product.price) * i.quantity).toFixed(2)),
+              recipientName: recipientName || null, phone: phone || null, addressLine, city: city || null, state: state || null, pinCode, country: country || null,
+            },
+          });
+        }
+        await prisma.marketplaceCart.deleteMany({ where: { id: { in: cartIds } } });
+        console.log('[Webhook] Marketplace cart orders created via webhook for payment', paymentId);
+
+      } else if (notes.type === 'event_cart') {
+        const { customerId, eventIds: eventIdsStr } = notes;
+        const eventIds: string[] = (eventIdsStr || '').split(',').filter(Boolean);
+        if (!customerId || eventIds.length === 0) return res.json({ status: 'ok' });
+
+        const items = await prisma.eventCart.findMany({ where: { eventId: { in: eventIds }, customerId }, include: { event: true } });
+        if (items.length === 0) { console.log('[Webhook] Event cart already processed'); return res.json({ status: 'ok' }); }
+
+        for (const i of items) {
+          await prisma.eventRegistration.upsert({
+            where: { eventId_customerId: { eventId: i.eventId, customerId } },
+            update: {},
+            create: { eventId: i.eventId, customerId, amount: i.event.price || '0' },
+          });
+        }
+        await prisma.eventCart.deleteMany({ where: { eventId: { in: eventIds }, customerId } });
+        console.log('[Webhook] Event cart registrations created via webhook for payment', paymentId);
       }
     }
 

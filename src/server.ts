@@ -138,7 +138,9 @@ import { getReferralSettings, updateReferralSettings, getMyReferralData, updateU
 import { createMarketplaceProduct, listMarketplaceProducts, getMarketplaceProduct, updateMarketplaceProduct, deleteMarketplaceProduct } from './adminpanel/marketplace.controller';
 import { listMarketplaceCategories, createMarketplaceCategory, deleteMarketplaceCategory } from './adminpanel/marketplaceCategory.controller';
 import { createMarketplaceOrder, listMarketplaceOrders, updateMarketplaceOrderStatus } from './adminpanel/marketplaceOrder.controller';
-import { createCourseRazorpayOrder, verifyCoursePayment, createMarketplaceRazorpayOrder, verifyMarketplacePayment, razorpayWebhook } from './razorpay/razorpay.controller';
+import { createCourseRazorpayOrder, verifyCoursePayment, createMarketplaceRazorpayOrder, verifyMarketplacePayment, razorpayWebhook, createEventRazorpayOrder, verifyEventPayment, createMarketplaceCartRazorpayOrder, verifyMarketplaceCartPayment, createEventCartRazorpayOrder, verifyEventCartPayment } from './razorpay/razorpay.controller';
+import { addToMarketplaceCart, listMarketplaceCart, updateMarketplaceCartItem, removeFromMarketplaceCart } from './cart/marketplaceCart.controller';
+import { addToEventCart, listEventCart, removeFromEventCart } from './cart/eventCart.controller';
 import { validateDiscountCode } from './order/checkout.controller';
 
 dotenv.config();
@@ -1330,6 +1332,49 @@ app.post('/razorpay/marketplace-order', authMiddleware, (req: AuthRequest, res: 
 });
 app.post('/razorpay/verify-marketplace', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
   verifyMarketplacePayment(req, res, next);
+});
+app.post('/razorpay/event-order', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  createEventRazorpayOrder(req, res, next);
+});
+app.post('/razorpay/verify-event', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  verifyEventPayment(req, res, next);
+});
+app.post('/razorpay/marketplace-cart-order', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  createMarketplaceCartRazorpayOrder(req, res, next);
+});
+app.post('/razorpay/verify-marketplace-cart', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  verifyMarketplaceCartPayment(req, res, next);
+});
+app.post('/razorpay/event-cart-order', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  createEventCartRazorpayOrder(req, res, next);
+});
+app.post('/razorpay/verify-event-cart', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
+  verifyEventCartPayment(req, res, next);
+});
+
+// Marketplace cart
+app.post('/marketplace-cart', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  addToMarketplaceCart(req as AuthRequest, res, next);
+});
+app.get('/marketplace-cart', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  listMarketplaceCart(req as AuthRequest, res, next);
+});
+app.patch('/marketplace-cart/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  updateMarketplaceCartItem(req as AuthRequest, res, next);
+});
+app.delete('/marketplace-cart/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  removeFromMarketplaceCart(req as AuthRequest, res, next);
+});
+
+// Event cart
+app.post('/event-cart', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  addToEventCart(req as AuthRequest, res, next);
+});
+app.get('/event-cart', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  listEventCart(req as AuthRequest, res, next);
+});
+app.delete('/event-cart/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  removeFromEventCart(req as AuthRequest, res, next);
 });
 
 // Marketplace Orders

@@ -170,6 +170,8 @@ model Customer {
   discountCoupon        DiscountCoupon[]
   EventRegistration     EventRegistration[]
   marketplaceOrders     MarketplaceOrder[]
+  marketplaceCart       MarketplaceCart[]
+  eventCart             EventCart[]
   status                ActiveStatus @default(ACTIVE)
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
@@ -600,6 +602,7 @@ model Event {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   EventRegistration EventRegistration[]
+  cart             EventCart[]
 }
 
 model EventRegistration {
@@ -635,6 +638,32 @@ model MarketplaceProduct {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   orders         MarketplaceOrder[]
+  cart           MarketplaceCart[]
+}
+
+model MarketplaceCart {
+  id         String             @id @default(uuid())
+  customer   Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String
+  product    MarketplaceProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId  String
+  quantity   Int                @default(1)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@unique([customerId, productId])
+}
+
+model EventCart {
+  id         String   @id @default(uuid())
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([customerId, eventId])
 }
 
 model MarketplaceCategory {
