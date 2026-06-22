@@ -25,12 +25,15 @@ export async function computeCartTotalWithCode(opts: {
 
   const cartItems = await prisma.cart.findMany({
     where: { id: { in: cartIds }, userId, status: 'ACTIVE' },
-    include: { course: { select: { id: true, price: true } } },
+    include: { course: { select: { id: true, price: true, discountedPrice: true } } },
   });
 
-  const priceOf = (c: { price: string }) => {
-    const p = parseFloat(c.price);
-    return isNaN(p) ? 0 : p;
+  // Effective price = discounted price when it's a valid, lower value
+  const priceOf = (c: { price: string; discountedPrice?: string | null }) => {
+    const base = parseFloat(c.price);
+    const disc = c.discountedPrice ? parseFloat(c.discountedPrice) : NaN;
+    if (!isNaN(disc) && disc > 0 && disc < base) return disc;
+    return isNaN(base) ? 0 : base;
   };
 
   const baseTotal = cartItems.reduce((s, it) => s + priceOf(it.course), 0);

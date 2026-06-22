@@ -34,6 +34,7 @@ export const createGeneralFAQ = async (
       data: {
         question,
         answer,
+        location: req.body.location || 'homepage',
         status: 'ACTIVE'
       }
     });
@@ -60,9 +61,11 @@ export const listGeneralFAQs = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    const { location } = req.query as { location?: string };
     const faqs = await prisma.generalFAQ.findMany({
       where: {
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        ...(location ? { location } : {})
       },
       orderBy: {
         createdAt: 'desc'
@@ -151,6 +154,7 @@ export const updateGeneralFAQ = async (
       data: {
         question: question !== undefined ? question : existingFaq.question,
         answer: answer !== undefined ? answer : existingFaq.answer,
+        location: req.body.location !== undefined ? req.body.location : (existingFaq as any).location,
         status: status !== undefined ? status : existingFaq.status
       }
     });

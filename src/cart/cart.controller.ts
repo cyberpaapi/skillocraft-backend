@@ -164,22 +164,31 @@ export const listCart = async (
     res.status(200).json({
       status: 1,
       message: cart.length > 0 ? 'Cart retrieved successfully' : 'No items found',
-      courses: cart.map(item => ({
-        id: item.id,
-        courseId: item.courseId,
-        name: item.course.name,
-        imageLink: item.course.image,
-        shortDescription: item.course.shortDescription,
-        longDescription: item.course.longDesription,
-        category: item.course.category,
-        creator: item.course.creator, 
-        productCount: item.course._count?.product || 0,
-        orderCount: item.course._count?.orders || 0,
-        status: item.course.status,
-        price: item.course.price,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt
-      }))
+      courses: cart.map(item => {
+        // Effective price = discounted price when it's a valid, lower value
+        const base = parseFloat(item.course.price);
+        const disc = item.course.discountedPrice ? parseFloat(item.course.discountedPrice) : NaN;
+        const hasDiscount = !isNaN(disc) && disc > 0 && disc < base;
+        const effective = hasDiscount ? item.course.discountedPrice! : item.course.price;
+        return {
+          id: item.id,
+          courseId: item.courseId,
+          name: item.course.name,
+          imageLink: item.course.image,
+          shortDescription: item.course.shortDescription,
+          longDescription: item.course.longDesription,
+          category: item.course.category,
+          creator: item.course.creator,
+          productCount: item.course._count?.product || 0,
+          orderCount: item.course._count?.orders || 0,
+          status: item.course.status,
+          price: effective,
+          originalPrice: item.course.price,
+          discountedPrice: hasDiscount ? item.course.discountedPrice : null,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt
+        };
+      })
     });
   } catch (error) {
     console.error('Error in listCart:', error);

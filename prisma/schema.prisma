@@ -487,6 +487,7 @@ model GeneralFAQ {
   id       String     @id @unique @default(uuid())
   question String
   answer String
+  location String @default("homepage") // homepage | live_online | live_offline | marketplace | blogs
   status ActiveStatus @default(ACTIVE)
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
@@ -684,6 +685,19 @@ model DoubtRequest {
   courseId   String?
   courseName String?
   message    String?
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model CertificateRequest {
+  id         String   @id @unique @default(uuid())
+  name       String
+  email      String
+  phone      String?
+  customerId String?
+  courseId   String?
+  courseName String?
   status     String   @default("PENDING")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

@@ -34,6 +34,7 @@ import {
 import { createReview, adminCreateReview, deleteReview } from './course/review.controller';
 import { createCallbackRequest, listCallbackRequests, updateCallbackRequest, deleteCallbackRequest } from './course/callback.controller';
 import { createDoubtRequest, listDoubtRequests, updateDoubtRequest, deleteDoubtRequest } from './course/doubt.controller';
+import { createCertificateRequest, listCertificateRequests, updateCertificateRequest, deleteCertificateRequest } from './course/certificate.controller';
 import { createCourseFAQ, listCourseFAQs, getCourseFAQById, getCourseFAQByCourseId, deleteCourseFAQ } from './adminpanel/courseFaq.controller';
 import { 
   createGeneralFAQ, 
@@ -463,6 +464,23 @@ app.patch('/adminpanel/doubt-requests/:id', authMiddleware, (req: Request, res: 
 
 app.delete('/adminpanel/doubt-requests/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
   deleteDoubtRequest(req as AuthRequest, res, next);
+});
+
+// Certificate Request Routes
+app.post('/certificate-requests', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  createCertificateRequest(req as AuthRequest, res, next);
+});
+
+app.get('/adminpanel/certificate-requests', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  listCertificateRequests(req as AuthRequest, res, next);
+});
+
+app.patch('/adminpanel/certificate-requests/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  updateCertificateRequest(req as AuthRequest, res, next);
+});
+
+app.delete('/adminpanel/certificate-requests/:id', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  deleteCertificateRequest(req as AuthRequest, res, next);
 });
 
 // Course FAQ Routes

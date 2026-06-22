@@ -78,6 +78,7 @@ export const listCourses = async (
         orderCount: course._count.orders,
         status: course.status,
         price: course.price,
+        discountedPrice: course.discountedPrice,
         createdBy: course.createdBy,
         createdAt: course.createdAt,
         updatedAt: course.updatedAt
