@@ -197,9 +197,16 @@ export const updateBlog = async (
 
     // Prepare update data (Blog has no `updatedBy` column — do not include it)
     void userId;
+    // Map the schema's `longDescription` to the Prisma column `longDesription`
+    // (note the typo in the schema). A raw spread would send `longDescription`,
+    // which is not a valid Prisma field and throws a 500 on every edit/save.
+    const { longDescription, ...rest } = data as Record<string, unknown>;
     const updateData: any = {
-      ...data,
+      ...rest,
     };
+    if (longDescription !== undefined) {
+      updateData.longDesription = longDescription;
+    }
 
     // If a new image was uploaded, update the image field
     if (req.file) {

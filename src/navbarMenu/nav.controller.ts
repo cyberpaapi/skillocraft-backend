@@ -36,13 +36,33 @@ export const getUserNavData = async (
             return;
         }
 
-        // Count active cart items for the user
-        const cartCount = await prisma.cart.count({
+        // Count active course cart items for the user
+        const courseCartCount = await prisma.cart.count({
             where: {
                 userId: user.id,
                 status: 'ACTIVE'
             }
         });
+
+        // Marketplace + event carts are keyed by the customer profile, not the
+        // user id — resolve the customer and count those too so the navbar badge
+        // reflects everything in the cart, not just courses.
+        let marketplaceCartCount = 0;
+        let eventCartCount = 0;
+        const customer = await prisma.customer.findFirst({
+            where: { userId: user.id },
+            select: { id: true }
+        });
+        if (customer) {
+            marketplaceCartCount = await prisma.marketplaceCart.count({
+                where: { customerId: customer.id }
+            });
+            eventCartCount = await prisma.eventCart.count({
+                where: { customerId: customer.id }
+            });
+        }
+
+        const cartCount = courseCartCount + marketplaceCartCount + eventCartCount;
 
         // For now, notification count is hardcoded to 0 as requested
         // This can be enhanced later to count actual notifications
