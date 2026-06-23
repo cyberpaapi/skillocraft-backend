@@ -144,6 +144,7 @@ export const getCourseDetails = async (
             id: true,
             details: true,
             ratting: true,
+            reviewerName: true,
             createdAt: true,
             updatedAt: true,
             customer: {
