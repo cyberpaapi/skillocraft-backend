@@ -10,6 +10,47 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET!,
 });
 
+/**
+ * When a buyer completes a purchase using someone's referral code, link them to
+ * that referrer so the referrer starts earning on the buyer's orders (the
+ * earnings calc in referral.controller reads these Referal links).
+ *
+ * - A customer can only be referred once (schema enforces referredId @unique),
+ *   so the first code used wins and we never overwrite an existing link.
+ * - A coupon code (which is not anyone's referral code) resolves to no referrer
+ *   and is safely ignored.
+ * - Never blocks/throws into the order flow — failures are logged only.
+ */
+async function linkReferralIfAny(referredCustomerId: string, rawCode?: string | null): Promise<void> {
+  const code = (rawCode || '').trim();
+  if (!code) return;
+  try {
+    const referrer = await prisma.customer.findUnique({
+      where: { referalCode: code },
+      select: { id: true },
+    });
+    if (!referrer || referrer.id === referredCustomerId) return;
+
+    const existing = await prisma.referal.findUnique({
+      where: { referredId: referredCustomerId },
+      select: { id: true },
+    });
+    if (existing) return;
+
+    await prisma.referal.create({
+      data: {
+        referrerId: referrer.id,
+        referredId: referredCustomerId,
+        referalCode: code,
+      },
+    });
+    console.log('[Referral] Linked referrer', referrer.id, '-> referred', referredCustomerId);
+  } catch (err) {
+    // Unique-constraint race or transient error — never block the order on this.
+    console.error('[Referral] Failed to link referral:', err);
+  }
+}
+
 // ─── Course checkout ──────────────────────────────────────────────────────────
 
 export const createCourseRazorpayOrder = async (
@@ -127,6 +168,15 @@ export const verifyCoursePayment = async (
     });
 
     await prisma.cart.deleteMany({ where: { id: { in: cartIds }, userId: user.id } });
+
+    // Credit the referrer (if a referral code was used) — read the code from the
+    // Razorpay order notes so it can't be tampered with client-side.
+    try {
+      const rzpOrder = await razorpay.orders.fetch(razorpayOrderId);
+      await linkReferralIfAny(customer.id, (rzpOrder?.notes as any)?.code);
+    } catch (e) {
+      console.error('[Referral] Could not fetch order notes for referral linking:', e);
+    }
 
     return res.json({ status: 1, message: 'Payment verified and order created', data: order });
   } catch (error) {
@@ -581,6 +631,10 @@ export const razorpayWebhook = async (req: Request, res: Response) => {
           });
 
           await prisma.cart.deleteMany({ where: { id: { in: cartIds } } });
+
+          // Credit the referrer (if a referral code was used on this purchase)
+          await linkReferralIfAny(customerId, notes.code);
+
           console.log('[Webhook] Course order created via webhook for payment', paymentId);
         }
 
