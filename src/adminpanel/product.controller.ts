@@ -357,7 +357,9 @@ export const updateProduct = async (
       ...(updateData.name && { name: updateData.name }),
       ...(updateData.courseId && { courseId: updateData.courseId }),
       ...(updateData.videoLink && { videoLink: updateData.videoLink }),
-      ...(updateData.description && { description: updateData.description }),
+      // The Prisma column is `discription` (note the typo) — map the schema's
+      // `description` onto it. Use !== undefined so the field can be cleared.
+      ...(updateData.description !== undefined && { discription: updateData.description }),
       ...(updateData.status && { status: updateData.status })
     }
   });
