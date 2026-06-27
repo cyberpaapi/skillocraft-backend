@@ -82,9 +82,16 @@ export const createCreator = async (
     }
 
     // Upload image if provided, otherwise use empty string (imageLink is nullable in schema)
-    const imageUrl = req.file
-      ? await uploadToSpaces(req.file, 'images/creator')
-      : '';
+    let imageUrl = '';
+    if (req.file) {
+      try {
+        imageUrl = await uploadToSpaces(req.file, 'images/creator');
+      } catch (uploadErr) {
+        console.error('Error uploading creator image:', uploadErr);
+        res.status(400).json({ status: 0, message: 'Failed to upload image. Please try a different image.' });
+        return;
+      }
+    }
     try {
       // Ensure we have a valid user
 
@@ -154,7 +161,9 @@ export const updateCreator = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const { creatorId } = req.params;
+  // The route param is :id — read it as such (was previously read as `creatorId`,
+  // which was always undefined and made update/delete silently fail).
+  const creatorId = req.params.id;
 
   try {
     // Check if course exists with proper typing
@@ -258,7 +267,7 @@ export const deleteCreator = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const { creatorId } = req.params;
+  const creatorId = req.params.id;
 
   try {
     // Check if the course exists
@@ -391,6 +400,3 @@ export const getCreatorById = async (
     next(error);
   }
 };
-
-// Export other controller functions
-export * from './creator.controller';

@@ -15,7 +15,7 @@ export const creatorSchema = z.object({
 export const createCreatorRequestSchema = z.object({
   name: z.string().min(2, 'Creator name must be at least 2 characters'),
   image: z.any().optional(), // This will be handled by multer
-  designation: z.string(),
-  description: z.string().min(10, 'Short description must be at least 10 characters'),
+  designation: z.string().optional().default(''),
+  description: z.string().min(1, 'Description is required'),
   status: z.nativeEnum(ActiveStatus).default(ActiveStatus.ACTIVE)
 });
