@@ -1,11 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import https from 'https';
+import crypto from 'crypto';
 import prisma from '../db/db.config';
 import { registerSchema, loginSchema, passwordUpdateSchema } from '../schemas/auth.schema';
 import { generateTokens, verifyRefreshToken } from '../utils/jwt';
 import { AuthRequest, Role } from '../types';
 import { ZodError } from 'zod';
+import { sendPasswordResetEmail } from '../emails/notify';
 
 /**
  * Register a new staff member
@@ -530,6 +532,99 @@ export const updatePassword = async (
         message: 'An error occurred while updating the password'
       });
     }
+  }
+};
+
+/**
+ * Forgot password — emails a reset link if the account exists.
+ * Always returns a generic success so the endpoint can't be used to discover
+ * which email addresses have accounts.
+ */
+export const forgotPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const generic = { status: 1, message: 'If an account exists for that email, a reset link has been sent.' };
+
+    if (!email) {
+      res.status(400).json({ status: 0, message: 'Email is required' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, loginType: true, customer: { select: { name: true } } },
+    });
+
+    // Don't reveal whether the account exists, and don't reset Google-only accounts.
+    if (!user || user.loginType !== 'EMAIL') {
+      res.status(200).json(generic);
+      return;
+    }
+
+    // Invalidate any previous reset tokens, then issue a fresh one (60 min TTL).
+    await prisma.token.updateMany({ where: { userId: user.id, valid: true }, data: { valid: false } });
+    const token = crypto.randomBytes(32).toString('hex');
+    await prisma.token.create({
+      data: {
+        userId: user.id,
+        emailToken: token,
+        valid: true,
+        expiration: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+
+    const name = user.customer[0]?.name || '';
+    await sendPasswordResetEmail(user.email, name, token);
+
+    res.status(200).json(generic);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reset password — consumes a valid, unexpired reset token and sets the new password.
+ */
+export const resetPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const token = String(req.body?.token || '').trim();
+    const newPassword = String(req.body?.newPassword || '');
+
+    if (!token || !newPassword) {
+      res.status(400).json({ status: 0, message: 'Token and new password are required' });
+      return;
+    }
+    if (newPassword.length < 6) {
+      res.status(400).json({ status: 0, message: 'Password must be at least 6 characters' });
+      return;
+    }
+
+    const record = await prisma.token.findUnique({ where: { emailToken: token } });
+    if (!record || !record.valid || record.expiration < new Date()) {
+      res.status(400).json({ status: 0, message: 'This reset link is invalid or has expired. Please request a new one.' });
+      return;
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: record.userId },
+      data: { password: hashed, refreshToken: null },
+    });
+
+    // One-time use — burn the token.
+    await prisma.token.update({ where: { id: record.id }, data: { valid: false } });
+
+    res.status(200).json({ status: 1, message: 'Password reset successful. You can now log in with your new password.' });
+  } catch (error) {
+    next(error);
   }
 };
 

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../db/db.config';
 import { AuthRequest } from '../types';
+import { notifyEventRegistration } from '../emails/notify';
 
 export const listEvents = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -59,6 +60,8 @@ export const registerForEvent = async (req: AuthRequest, res: Response, next: Ne
     const registration = await prisma.eventRegistration.create({
       data: { eventId, customerId: customer.id, amount: event.price },
     });
+
+    await notifyEventRegistration(customer.id, [event.title], event.price || '0');
 
     res.json({ status: 1, message: 'Registration successful', data: registration });
   } catch (err) {

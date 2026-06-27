@@ -3,7 +3,7 @@ import path from 'path';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { loginUser, refreshTokens, logoutUser, registerUser, googleLogin } from './accounts/auth.controller';
-import { updatePassword } from './accounts/auth.controller';
+import { updatePassword, forgotPassword, resetPassword } from './accounts/auth.controller';
 import { getCustomerData, updateCustomerData } from './accounts/accounts.controller';
 import { getCustomerAnalysis, getCustomerDetails } from './adminpanel/customeranalysis.controller';
 import { authMiddleware } from './accounts/auth.middleware';
@@ -313,6 +313,14 @@ app.post('/accounts/refresh-token', (req: Request, res: Response, next: NextFunc
 // Logout Route
 app.post('/accounts/logout', authMiddleware, (req: AuthRequest, res: Response, next: NextFunction) => {
   logoutUser(req, res, next);
+});
+
+app.post('/accounts/forgot-password', (req: Request, res: Response, next: NextFunction) => {
+  forgotPassword(req, res, next);
+});
+
+app.post('/accounts/reset-password', (req: Request, res: Response, next: NextFunction) => {
+  resetPassword(req, res, next);
 });
 
 app.post('/accounts/login', (req: Request, res: Response, next: NextFunction) => {

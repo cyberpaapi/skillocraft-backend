@@ -4,6 +4,12 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../types';
 import prisma from '../db/db.config';
 import { computeCartTotalWithCode } from '../order/checkout.controller';
+import {
+  notifyCoursePurchase,
+  notifyMarketplacePurchase,
+  notifyEventRegistration,
+  notifyReferralUsed,
+} from '../emails/notify';
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
@@ -45,6 +51,8 @@ async function linkReferralIfAny(referredCustomerId: string, rawCode?: string | 
       },
     });
     console.log('[Referral] Linked referrer', referrer.id, '-> referred', referredCustomerId);
+    // Tell the code owner that someone used their referral code
+    await notifyReferralUsed(referrer.id, referredCustomerId);
   } catch (err) {
     // Unique-constraint race or transient error — never block the order on this.
     console.error('[Referral] Failed to link referral:', err);
@@ -178,6 +186,9 @@ export const verifyCoursePayment = async (
       console.error('[Referral] Could not fetch order notes for referral linking:', e);
     }
 
+    // Email the buyer their purchase confirmation
+    await notifyCoursePurchase(customer.id, cartItems.map((i) => i.course.name), String(totalAmount), razorpayPaymentId);
+
     return res.json({ status: 1, message: 'Payment verified and order created', data: order });
   } catch (error) {
     next(error);
@@ -285,6 +296,9 @@ export const verifyMarketplacePayment = async (
       },
     });
 
+    const mp = await prisma.marketplaceProduct.findUnique({ where: { id: productId }, select: { name: true } });
+    await notifyMarketplacePurchase(customer.id, [{ name: mp?.name || 'Product', qty: Number(quantity) || 1, price: String(totalAmount) }], String(totalAmount));
+
     return res.json({ status: 1, message: 'Payment verified and order placed', data: order });
   } catch (error) {
     next(error);
@@ -372,10 +386,12 @@ export const verifyEventPayment = async (
     });
     if (existing) return res.json({ status: 1, message: 'Already registered', data: existing });
 
-    const event = await prisma.event.findUnique({ where: { id: eventId }, select: { price: true } });
+    const event = await prisma.event.findUnique({ where: { id: eventId }, select: { price: true, title: true } });
     const registration = await prisma.eventRegistration.create({
       data: { eventId, customerId: customer.id, amount: event?.price || '0' },
     });
+
+    await notifyEventRegistration(customer.id, [event?.title || 'Event'], event?.price || '0');
 
     return res.json({ status: 1, message: 'Payment verified and registered', data: registration });
   } catch (error) {
@@ -475,6 +491,13 @@ export const verifyMarketplaceCartPayment = async (
     }
     await prisma.marketplaceCart.deleteMany({ where: { customerId: customer.id } });
 
+    const mpcTotal = items.reduce((s, i) => s + parseFloat(i.product.price) * i.quantity, 0).toFixed(2);
+    await notifyMarketplacePurchase(
+      customer.id,
+      items.map((i) => ({ name: i.product.name, qty: i.quantity, price: (parseFloat(i.product.price) * i.quantity).toFixed(2) })),
+      mpcTotal
+    );
+
     return res.json({ status: 1, message: 'Payment verified and orders placed', data: created });
   } catch (error) {
     next(error);
@@ -508,6 +531,7 @@ export const createEventCartRazorpayOrder = async (
         });
       }
       await prisma.eventCart.deleteMany({ where: { customerId: customer.id } });
+      await notifyEventRegistration(customer.id, items.map((i) => i.event.title), '0');
       return res.json({ status: 1, free: true, message: 'Registered for all events' });
     }
 
@@ -560,6 +584,9 @@ export const verifyEventCartPayment = async (
       });
     }
     await prisma.eventCart.deleteMany({ where: { customerId: customer.id } });
+
+    const evcTotal = items.reduce((s, i) => s + parseFloat(i.event.price || '0'), 0).toFixed(2);
+    await notifyEventRegistration(customer.id, items.map((i) => i.event.title), evcTotal);
 
     return res.json({ status: 1, message: 'Payment verified and registered', data: items.map((i) => i.eventId) });
   } catch (error) {
@@ -635,6 +662,9 @@ export const razorpayWebhook = async (req: Request, res: Response) => {
           // Credit the referrer (if a referral code was used on this purchase)
           await linkReferralIfAny(customerId, notes.code);
 
+          // Email the buyer their purchase confirmation
+          await notifyCoursePurchase(customerId, cartItems.map((i) => i.course.name), String(totalAmount), paymentId);
+
           console.log('[Webhook] Course order created via webhook for payment', paymentId);
         }
 
@@ -671,6 +701,10 @@ export const razorpayWebhook = async (req: Request, res: Response) => {
           },
         });
 
+        {
+          const mpW = await prisma.marketplaceProduct.findUnique({ where: { id: productId }, select: { name: true } });
+          await notifyMarketplacePurchase(customerId, [{ name: mpW?.name || 'Product', qty: Number(quantity) || 1, price: String(totalAmount) }], String(totalAmount));
+        }
         console.log('[Webhook] Marketplace order created via webhook for payment', paymentId);
       } else if (notes.type === 'event') {
         const { customerId, eventId, amount } = notes;
@@ -688,6 +722,10 @@ export const razorpayWebhook = async (req: Request, res: Response) => {
         await prisma.eventRegistration.create({
           data: { eventId, customerId, amount: String(amount || '0') },
         });
+        {
+          const evW = await prisma.event.findUnique({ where: { id: eventId }, select: { title: true } });
+          await notifyEventRegistration(customerId, [evW?.title || 'Event'], String(amount || '0'));
+        }
         console.log('[Webhook] Event registration created via webhook for payment', paymentId);
 
       } else if (notes.type === 'marketplace_cart') {
@@ -708,6 +746,10 @@ export const razorpayWebhook = async (req: Request, res: Response) => {
           });
         }
         await prisma.marketplaceCart.deleteMany({ where: { id: { in: cartIds } } });
+        {
+          const mpcW = items.reduce((s, i) => s + parseFloat(i.product.price) * i.quantity, 0).toFixed(2);
+          await notifyMarketplacePurchase(customerId, items.map((i) => ({ name: i.product.name, qty: i.quantity, price: (parseFloat(i.product.price) * i.quantity).toFixed(2) })), mpcW);
+        }
         console.log('[Webhook] Marketplace cart orders created via webhook for payment', paymentId);
 
       } else if (notes.type === 'event_cart') {
@@ -726,6 +768,10 @@ export const razorpayWebhook = async (req: Request, res: Response) => {
           });
         }
         await prisma.eventCart.deleteMany({ where: { eventId: { in: eventIds }, customerId } });
+        {
+          const evcW = items.reduce((s, i) => s + parseFloat(i.event.price || '0'), 0).toFixed(2);
+          await notifyEventRegistration(customerId, items.map((i) => i.event.title), evcW);
+        }
         console.log('[Webhook] Event cart registrations created via webhook for payment', paymentId);
       }
     }
