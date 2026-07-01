@@ -1,13 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../db/db.config';
-import { AuthRequest } from '../types';
+import { AuthRequest, UserResponse } from '../types';
+import { generateTokens } from '../utils/jwt';
 import { z } from 'zod';
 
 // Validation schema for updating customer data
 const updateCustomerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').optional(),
   contact: z.string().min(10, 'Contact must be at least 10 characters').optional(),
+  email: z.string().email('Invalid email address').optional(),
   avatarUrl: z.string().url('Invalid URL format').optional().or(z.literal(''))
 });
 
@@ -167,22 +169,38 @@ export const updateCustomerData = async (
     // Get the first customer (should be the only one)
     const customer = user.customer[0];
 
-    const { name, ...userData } = validation.data;
-    
+    const { name, email, ...userData } = validation.data;
+
+    // Handle email change: must be unique, and only for email-login accounts.
+    const newEmail = email?.trim().toLowerCase();
+    const emailChanged = !!newEmail && newEmail !== user.email.toLowerCase();
+    if (emailChanged) {
+      if (user.loginType !== 'EMAIL') {
+        res.status(400).json({ status: 0, message: 'Email cannot be changed for accounts created with Google sign-in.' });
+        return;
+      }
+      const taken = await prisma.user.findUnique({ where: { email: newEmail }, select: { id: true } });
+      if (taken && taken.id !== user.id) {
+        res.status(400).json({ status: 0, message: 'This email is already in use by another account.' });
+        return;
+      }
+    }
+
     // Start a transaction to update both user and customer records
-    const [updatedUser, updatedCustomer] = await prisma.$transaction([
-      // Update user data (contact, avatarUrl)
+    await prisma.$transaction([
+      // Update user data (contact, avatarUrl, email)
       prisma.user.update({
         where: { id: user.id },
         data: {
           ...(userData.contact && { contact: userData.contact }),
-          ...(userData.avatarUrl !== undefined && { 
-            avatarUrl: userData.avatarUrl || null 
+          ...(userData.avatarUrl !== undefined && {
+            avatarUrl: userData.avatarUrl || null
           }),
+          ...(emailChanged && { email: newEmail }),
           updatedAt: new Date()
         }
       }),
-      
+
       // Update customer data (name)
       prisma.customer.update({
         where: { id: customer.id },
@@ -245,10 +263,17 @@ export const updateCustomerData = async (
       }
     });
 
+    // If the email changed, the old JWT (keyed on email) is now stale — issue
+    // fresh tokens so the client can keep the session without re-logging in.
+    const tokens = emailChanged
+      ? generateTokens({ id: user.id, email: newEmail as string, role: user.role } as UserResponse)
+      : undefined;
+
     res.status(200).json({
       status: 1,
       message: 'Profile updated successfully',
-      data: customerWithDetails
+      data: customerWithDetails,
+      ...(tokens && { tokens })
     });
   } catch (error) {
     console.error('Error updating customer profile:', error);

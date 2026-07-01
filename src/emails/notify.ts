@@ -130,7 +130,7 @@ export async function notifyReferralUsed(referrerId: string, referredCustomerId:
     const body = `
       <p>Good news, ${referrer.name}! ${who} just signed up using your referral code and made a purchase.</p>
       <p>You'll earn referral rewards on their purchases. Track your earnings and request a payout from your referral dashboard.</p>
-      <a href="${appUrl()}/refer" style="display:inline-block;margin-top:8px;background:${PRIMARY};color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:bold;">View My Earnings</a>`;
+      <a href="${appUrl()}/referral" style="display:inline-block;margin-top:8px;background:${PRIMARY};color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:bold;">View My Earnings</a>`;
     await sendEmail({ to: referrer.email, subject: `Someone used your ${BRAND} referral code 🎉`, html: layout('You earned a referral!', body) });
   } catch (e) {
     console.error('[mail] notifyReferralUsed failed', e);
