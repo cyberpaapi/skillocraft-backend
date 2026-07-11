@@ -259,23 +259,28 @@ export const deleteProductVideo = async (
       return;
     }
 
+    // Best-effort removal of the stored video — never block the DB reset on a
+    // storage error, otherwise "delete video" fails even though the intent is
+    // just to clear it from the lesson.
     try {
       if (VDOCIPHER_ID_REGEX.test(product.videoLink)) {
         deleteVideoFromVdoCipher(product.videoLink).catch(console.error);
+      } else if (product.videoLink.includes('/index.m3u8')) {
+        // HLS videos live as a folder on R2 (…/index.m3u8)
+        await deleteFolderFromSpaces(product.videoLink.replace('/index.m3u8', ''));
       } else if (!BUNNY_GUID_REGEX.test(product.videoLink)) {
         deleteFile(product.videoLink);
       }
-
-      await prisma.product.update({
-        where: { id: productId },
-        data: { videoLink: '' },
-      });
-
-      res.status(200).json({ message: 'Video deleted successfully' });
-    } catch (error) {
-      console.error('Error deleting video:', error);
-      throw new Error('Failed to delete video');
+    } catch (storageErr) {
+      console.error('Error removing stored video (continuing):', storageErr);
     }
+
+    await prisma.product.update({
+      where: { id: productId },
+      data: { videoLink: '', videoStatus: 'idle' },
+    });
+
+    res.status(200).json({ message: 'Video deleted successfully' });
   } catch (error) {
     next(error);
   }
