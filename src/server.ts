@@ -71,7 +71,7 @@ import {
   getCustomerCourseProgress,
   getCustomerCourseAnalytics
 } from './analytics/video-analytics.controller';
-import { createProduct, reorderProducts, updateProductThumbnail, updateProduct } from './adminpanel/product.controller';
+import { createProduct, reorderProducts, updateProductThumbnail, updateProduct, deleteProduct } from './adminpanel/product.controller';
 import { 
   getBlogs, 
   getBlogById 
@@ -695,6 +695,11 @@ app.post('/adminpanel/products/:productId/thumbnail', authMiddleware, uploadProd
 // Edit a lesson's name/description (video replacement uses the presigned-upload flow)
 app.put('/adminpanel/products/:productId', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
   updateProduct(req as AuthRequest, res, next);
+});
+
+// Delete a lesson
+app.delete('/adminpanel/products/:productId', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  deleteProduct(req as AuthRequest, res, next);
 });
 
 //blogs Routes (Public)
