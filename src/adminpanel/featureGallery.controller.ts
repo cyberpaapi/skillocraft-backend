@@ -58,7 +58,8 @@ export const createFeatureGallery = async (
     const newGallery = await prisma.featureGallery.create({
       data: {
         imageLink: imageUrl,
-        description: description || null,
+        // description is a required column; the admin form treats it as optional
+        description: description || '',
         linkUrl: linkUrl || null,
         status: 'ACTIVE' as ActiveStatus
       }
