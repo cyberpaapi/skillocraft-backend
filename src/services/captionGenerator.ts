@@ -4,6 +4,7 @@ import path from 'path';
 import { HeadObjectCommand } from '@aws-sdk/client-s3';
 import { spacesClient } from '../config/spaces';
 import { downloadFromR2, readTextFromR2 } from './r2Presign';
+import { getSettingValue } from './settings';
 
 // ── Config ───────────────────────────────────────────────────────────────────
 // Whisper rejects uploads over 25MB. We transcode to mono 16kHz 32kbps MP3
@@ -132,12 +133,7 @@ async function extractAudioChunks(mediaPath: string, outDir: string): Promise<st
 
 // ── OpenAI transcription ─────────────────────────────────────────────────────
 
-async function transcribeChunk(filePath: string): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new CaptionError('OPENAI_API_KEY is not configured on the server');
-  }
-
+async function transcribeChunk(filePath: string, apiKey: string): Promise<string> {
   const buffer = await fs.readFile(filePath);
 
   let lastError = '';
@@ -227,6 +223,14 @@ export async function generateEnglishCaptions(
   productId: string,
   videoLink: string
 ): Promise<string> {
+  // Resolved once per job: the admin panel setting wins, env is the fallback.
+  const apiKey = await getSettingValue('openai_api_key', 'OPENAI_API_KEY');
+  if (!apiKey) {
+    throw new CaptionError(
+      'No OpenAI API key configured. Add one under Site Settings, or set OPENAI_API_KEY.'
+    );
+  }
+
   const workDir = path.join(process.cwd(), 'temp', 'captions', productId);
   await fs.ensureDir(workDir);
 
@@ -240,7 +244,7 @@ export async function generateEnglishCaptions(
     console.log(`[CC] ${productId}: transcribing ${chunks.length} chunk(s)`);
     const parts: string[] = [];
     for (const chunk of chunks) {
-      parts.push(await transcribeChunk(chunk));
+      parts.push(await transcribeChunk(chunk, apiKey));
     }
 
     const vtt = mergeVtt(parts, CHUNK_SECONDS);

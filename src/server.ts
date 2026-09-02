@@ -141,7 +141,9 @@ import {
   uploadProductThumbnail,
 } from './middleware/upload.middleware';
 import { createCourseDownload, listCourseDownloads, deleteCourseDownload } from './adminpanel/courseDownload.controller';
-import { getSiteSettings, setSiteSetting, uploadSiteVideo, uploadSiteImage, removeSiteImageItem } from './adminpanel/siteSettings.controller';
+import { getSiteSettings, setSiteSetting, uploadSiteVideo, uploadSiteImage, removeSiteImageItem,
+  getAdminSiteSettings,
+} from './adminpanel/siteSettings.controller';
 import { createAuthor, deleteAuthor, getAuthorById, getAuthors, updateAuthor } from './adminpanel/author.controller';
 import { createCreator, deleteCreator, getCreatorById, getCreators, updateCreator } from './adminpanel/creator.controller';
 import { createSuccessStory, deleteSuccessStory, getSuccessStoryById, listSuccessStory } from './adminpanel/success.controller';
@@ -1486,6 +1488,10 @@ app.delete('/adminpanel/course-downloads/:downloadId', authMiddleware, (req: Req
 // Site Settings
 app.get('/site-settings', (req: Request, res: Response) => {
   getSiteSettings(req, res);
+});
+// Admin view of every setting; secrets come back masked
+app.get('/adminpanel/site-settings', authMiddleware, (req: Request, res: Response) => {
+  getAdminSiteSettings(req as AuthRequest, res);
 });
 app.post('/adminpanel/site-settings', authMiddleware, (req: Request, res: Response) => {
   setSiteSetting(req as AuthRequest, res);
