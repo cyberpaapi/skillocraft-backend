@@ -299,6 +299,10 @@ model Product {
   lessonType  LessonType   @default(VIDEO)
   videoLink   String?
   videoStatus String       @default("idle")
+  captionStatus String     @default("none")
+  captionLink   String?
+  captionError  String?
+  captionUpdatedAt DateTime?
   textContent String?
   thumbnail   String?
   status      ActiveStatus @default(ACTIVE)

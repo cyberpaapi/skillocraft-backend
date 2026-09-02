@@ -10,6 +10,21 @@ import prisma from '../db/db.config';
 const BUNNY_GUID_REGEX   = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VDOCIPHER_ID_REGEX = /^[0-9a-f]{32}$/i;
 
+/**
+ * Caption track for a lesson we host ourselves, if one has been generated.
+ * Uses the same short-lived token as the HLS manifest so the player needs no
+ * extra round trip. Students only ever read this; generation is admin-only.
+ */
+const captionFields = async (productId: string | undefined, token: string) => {
+  if (!productId) return {};
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { captionStatus: true, captionLink: true },
+  });
+  if (product?.captionStatus !== 'ready' || !product.captionLink) return {};
+  return { captionUrl: `/stream/captions/${productId}?token=${token}` };
+};
+
 export const streamChunkVideo = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const decoded = decodeURIComponent(req.params.key);
@@ -42,7 +57,9 @@ export const streamChunkVideo = async (req: AuthRequest, res: Response, next: Ne
     // ── R2 raw MP4 ───────────────────────────────────────────────────────────
     if (key.startsWith('videos/raw/')) {
       const url = await getPresignedGetUrl(key, 5 * 60);
-      return res.json({ url, provider: 'r2-mp4' });
+      const productId = key.split('/')[2]?.replace(/\.[^.]+$/, '');
+      const token = jwt.sign({ productId }, process.env.JWT_SECRET!, { expiresIn: '30m' });
+      return res.json({ url, provider: 'r2-mp4', ...(await captionFields(productId, token)) });
     }
 
     // ── R2 HLS — return a manifest URL with a short-lived token ──────────────
@@ -51,7 +68,7 @@ export const streamChunkVideo = async (req: AuthRequest, res: Response, next: Ne
       const productId = key.split('/')[2];
       const token = jwt.sign({ productId }, process.env.JWT_SECRET!, { expiresIn: '30m' });
       const manifestUrl = `/stream/hls/${productId}?token=${token}`;
-      return res.json({ url: manifestUrl, provider: 'r2-hls' });
+      return res.json({ url: manifestUrl, provider: 'r2-hls', ...(await captionFields(productId, token)) });
     }
 
     // ── Direct URL ───────────────────────────────────────────────────────────

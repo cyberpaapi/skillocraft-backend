@@ -72,6 +72,13 @@ import {
   getCustomerCourseAnalytics
 } from './analytics/video-analytics.controller';
 import { createProduct, reorderProducts, updateProductThumbnail, updateProduct, deleteProduct } from './adminpanel/product.controller';
+import {
+  generateProductCaptions,
+  generateCourseCaptions,
+  getCourseCaptionStatus,
+  deleteProductCaptions,
+  serveCaptions,
+} from './adminpanel/captions.controller';
 import { 
   getBlogs, 
   getBlogById 
@@ -702,6 +709,24 @@ app.delete('/adminpanel/products/:productId', authMiddleware, (req: Request, res
   deleteProduct(req as AuthRequest, res, next);
 });
 
+// ── Captions (CC) ────────────────────────────────────────────────────────────
+// Generation is admin-only; students only ever read the finished VTT.
+app.post('/adminpanel/products/:productId/captions', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  generateProductCaptions(req as AuthRequest, res, next);
+});
+
+app.delete('/adminpanel/products/:productId/captions', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  deleteProductCaptions(req as AuthRequest, res, next);
+});
+
+app.post('/adminpanel/courses/:courseId/captions', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  generateCourseCaptions(req as AuthRequest, res, next);
+});
+
+app.get('/adminpanel/courses/:courseId/captions/status', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  getCourseCaptionStatus(req as AuthRequest, res, next);
+});
+
 //blogs Routes (Public)
 app.get('/blogs', (req: Request, res: Response, next: NextFunction) => {
   getBlogs(req, res, next);
@@ -887,6 +912,11 @@ app.get("/stream/:key", authMiddleware, (req: Request, res: Response, next: Next
 // HLS manifest — token in query string, no authMiddleware needed
 app.get("/stream/hls/:productId", (req: Request, res: Response, next: NextFunction) => {
   serveHlsManifest(req as AuthRequest, res, next);
+});
+
+// Caption track — same short-lived token as the HLS manifest
+app.get("/stream/captions/:productId", (req: Request, res: Response, next: NextFunction) => {
+  serveCaptions(req as AuthRequest, res, next);
 });
 
 // Direct R2 upload — presigned PUT URL
