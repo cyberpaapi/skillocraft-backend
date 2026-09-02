@@ -107,6 +107,30 @@ model User {
   videoAnalytics VideoAnalytics[]
 }
 
+/// A language available in the admin audio-track dropdown. Admins can add new
+/// ones (including variants like "Hindi 2") and they stay available for reuse.
+model Language {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  code      String?
+  createdAt DateTime @default(now())
+}
+
+/// An alternate-language audio track for a lesson. A lesson may hold unlimited
+/// tracks, but never two in the same language — enforced by the unique index.
+model ProductAudioTrack {
+  id        String   @id @default(uuid())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+  language  String
+  audioLink String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, language])
+  @@index([productId])
+}
+
 model Token {
   id         Int       @id @default(autoincrement())
   createdAt  DateTime  @default(now())
@@ -311,6 +335,7 @@ model Product {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   videoAnalytics VideoAnalytics[]
+  audioTracks ProductAudioTrack[]
 }
 
 

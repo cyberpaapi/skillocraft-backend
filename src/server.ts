@@ -79,6 +79,14 @@ import {
   deleteProductCaptions,
   serveCaptions,
 } from './adminpanel/captions.controller';
+import {
+  listLanguages,
+  createLanguage,
+  listAudioTracks,
+  getAudioUploadUrl,
+  createAudioTrack,
+  deleteAudioTrack,
+} from './adminpanel/audioTracks.controller';
 import { 
   getBlogs, 
   getBlogById 
@@ -725,6 +733,31 @@ app.post('/adminpanel/courses/:courseId/captions', authMiddleware, (req: Request
 
 app.get('/adminpanel/courses/:courseId/captions/status', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
   getCourseCaptionStatus(req as AuthRequest, res, next);
+});
+
+// ── Alternate-language audio tracks ──────────────────────────────────────────
+app.get('/adminpanel/languages', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  listLanguages(req as AuthRequest, res, next);
+});
+
+app.post('/adminpanel/languages', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  createLanguage(req as AuthRequest, res, next);
+});
+
+app.get('/adminpanel/products/:productId/audio-tracks', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  listAudioTracks(req as AuthRequest, res, next);
+});
+
+app.post('/adminpanel/products/:productId/audio-tracks/upload-url', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  getAudioUploadUrl(req as AuthRequest, res, next);
+});
+
+app.post('/adminpanel/products/:productId/audio-tracks', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  createAudioTrack(req as AuthRequest, res, next);
+});
+
+app.delete('/adminpanel/audio-tracks/:trackId', authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+  deleteAudioTrack(req as AuthRequest, res, next);
 });
 
 //blogs Routes (Public)

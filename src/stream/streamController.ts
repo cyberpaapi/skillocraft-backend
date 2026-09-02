@@ -6,6 +6,7 @@ import { getVdoCipherOTP } from '../services/vdoCipher';
 import { getPresignedGetUrl } from '../services/r2Presign';
 import { AuthRequest } from '../types';
 import prisma from '../db/db.config';
+import { getPlayableAudioTracks } from '../adminpanel/audioTracks.controller';
 
 const BUNNY_GUID_REGEX   = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VDOCIPHER_ID_REGEX = /^[0-9a-f]{32}$/i;
@@ -23,6 +24,13 @@ const captionFields = async (productId: string | undefined, token: string) => {
   });
   if (product?.captionStatus !== 'ready' || !product.captionLink) return {};
   return { captionUrl: `/stream/captions/${productId}?token=${token}` };
+};
+
+/** Alternate-language audio for the player's track selector, if any exists. */
+const audioTrackFields = async (productId: string | undefined) => {
+  if (!productId) return {};
+  const tracks = await getPlayableAudioTracks(productId);
+  return tracks.length ? { audioTracks: tracks } : {};
 };
 
 export const streamChunkVideo = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -59,7 +67,12 @@ export const streamChunkVideo = async (req: AuthRequest, res: Response, next: Ne
       const url = await getPresignedGetUrl(key, 5 * 60);
       const productId = key.split('/')[2]?.replace(/\.[^.]+$/, '');
       const token = jwt.sign({ productId }, process.env.JWT_SECRET!, { expiresIn: '30m' });
-      return res.json({ url, provider: 'r2-mp4', ...(await captionFields(productId, token)) });
+      return res.json({
+        url,
+        provider: 'r2-mp4',
+        ...(await captionFields(productId, token)),
+        ...(await audioTrackFields(productId)),
+      });
     }
 
     // ── R2 HLS — return a manifest URL with a short-lived token ──────────────
@@ -68,7 +81,12 @@ export const streamChunkVideo = async (req: AuthRequest, res: Response, next: Ne
       const productId = key.split('/')[2];
       const token = jwt.sign({ productId }, process.env.JWT_SECRET!, { expiresIn: '30m' });
       const manifestUrl = `/stream/hls/${productId}?token=${token}`;
-      return res.json({ url: manifestUrl, provider: 'r2-hls', ...(await captionFields(productId, token)) });
+      return res.json({
+        url: manifestUrl,
+        provider: 'r2-hls',
+        ...(await captionFields(productId, token)),
+        ...(await audioTrackFields(productId)),
+      });
     }
 
     // ── Direct URL ───────────────────────────────────────────────────────────
